@@ -9,7 +9,7 @@ The system uses computer vision techniques to monitor visual fatigue indicators 
 - NumPy
 
 1️⃣ Clone the repository
-- git clone https://github.com/yourusername/WakeBrake.git
+- git clone https://github.com/sutayniee/Wake-Brake.git
 - cd WakeBrake
 
 2️⃣ Create a virtual environment
