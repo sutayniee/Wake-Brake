@@ -47,3 +47,18 @@ Push changes to GitHub
 
 Pull latest updates
 - git pull
+
+Switch branch
+- git switch (name of existing branch)
+
+Create and switch to the branch
+- git checkout -b (name of branch)
+
+Delete branch
+- git branch -d (branch_name)
+
+Steps to Merge:
+- Switch to the main branch: git checkout main
+- Pull latest changes: git pull origin main (to avoid conflicts)
+- Merge the feature branch: git merge your-feature-branch
+- Push the changes: git push origin main 
