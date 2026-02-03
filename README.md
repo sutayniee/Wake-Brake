@@ -32,6 +32,10 @@ python -c "import cv2; import numpy; print('Setup successful')"
 - Select Python: Select Interpreter
 - Choose the interpreter inside the venv folder
 
+If dlib won't install
+- cd dlib
+- python -m pip install dlib-19.24.1-cp311-cp311-win_amd64.whl
+
 🔁 Basic Git Commands (Quick Reference)
 Check repository status
 - git status
