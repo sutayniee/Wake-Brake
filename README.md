@@ -16,16 +16,24 @@ The system uses computer vision techniques to monitor visual fatigue indicators 
 - python -m venv venv
 
 3️⃣ Activate the virtual environment
-- Windows (PowerShell):
-- venv\Scripts\Activate
-- If activation is successful, you should see:
+▶ Command Prompt (CMD)
+- venv\Scripts\activate
+
+▶ PowerShell (VS Code default)
+- venv\Scripts\Activate.ps1
+
+If PowerShell blocks it, run once:
+- Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+Then try activating again.
+If activation is successful, you should see:
   (venv)
 
 4️⃣ Install dependencies
 - pip install -r requirements.txt
 
 5️⃣ Verify installation
-python -c "import cv2; import numpy; print('Setup successful')"
+- python -c "import cv2; import numpy; print('Setup successful')"
 
 6️⃣ Select the virtual environment in VS Code (Important)
 - Press Ctrl + Shift + P
