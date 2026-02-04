@@ -27,7 +27,7 @@ def detect(img, faceCascade, return_roi=False):
         scaleFactor=1.1,
         minNeighbors=8,
         flags=cv2.CASCADE_SCALE_IMAGE,
-        minSize=(80, 80),
+        minSize=(90, 90),
     )
 
     face = _select_largest(faces)
@@ -40,7 +40,7 @@ def detect(img, faceCascade, return_roi=False):
     x, y, w, h = _pad_box(x, y, w, h, pad=10, max_w=w_img, max_h=h_img)
 
     cv2.rectangle(img, (x, y), (x + w, y + h), color["blue"], 2)
-    cv2.putText(img, "Face", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color["blue"], 1, cv2.LINE_AA)
+    cv2.putText(img, "Driver", (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color["blue"], 1, cv2.LINE_AA)
 
     face_roi = img[y:y + h, x:x + w]
     if return_roi:
