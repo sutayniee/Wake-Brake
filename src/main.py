@@ -10,6 +10,7 @@ video_capture = cv2.VideoCapture(0)
 
 while True:
     _, img = video_capture.read()
+    img = cv2.flip(img, 1)
     img = detect(img, faceCascade)
     cv2.imshow("Test", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
