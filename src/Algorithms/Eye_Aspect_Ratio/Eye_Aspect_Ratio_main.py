@@ -1,14 +1,18 @@
 import cv2
 import dlib
 import numpy as np
+from pathlib import Path
 
+_ROOT = Path(__file__).resolve().parent
+_CASCADE_PREDICTOR = _ROOT / "Model" / "shape_predictor_68_face_landmarks.dat"
+Shape_Predictor = cv2.CascadeClassifier(str(_CASCADE_PREDICTOR))
 
 class FaceLandmarkDetector:
     """
     A class for detecting 68 facial landmarks using dlib's pre-trained models.
 
     This class provides functionality to:
-    - Detect faces in an image using HOG + SVM
+    - Detect faces in an image using Haar Cascade (ROI)
     - Predict 68 facial landmarks for each face
     - Optionally draw connections between landmarks or just points
     - Draw bounding boxes around detected faces
@@ -27,7 +31,7 @@ class FaceLandmarkDetector:
         "inner_mouth": (60, 68),
     }
 
-    def __init__(self, model_path: str = "shape_predictor_68_face_landmarks.dat"):
+    def __init__(self, model_path: str = Shape_Predictor):
         """
         Initializes the FaceLandmarkDetector class.
 
@@ -140,11 +144,15 @@ class FaceLandmarkDetector:
 
 
 def main():
+
+    _ROOT = Path(__file__).resolve().parent
+    _CASCADE_PREDICTOR = _ROOT / "Model" / "shape_predictor_68_face_landmarks.dat"
+    Shape_Predictor = cv2.CascadeClassifier(str(_CASCADE_PREDICTOR))
     # Start video capture
     cap = cv2.VideoCapture(0)
 
     # Initialize the landmark detector
-    detector = FaceLandmarkDetector("../models/shape_predictor_68_face_landmarks.dat")
+    detector = FaceLandmarkDetector(Shape_Predictor)
 
     while True:
         ret, frame = cap.read()
