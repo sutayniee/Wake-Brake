@@ -16,7 +16,7 @@ The system uses computer vision techniques to monitor visual fatigue indicators 
 2. Create a virtual environment
 - python -m venv venv
 
-3️⃣ Activate the virtual environment
+3. Activate the virtual environment
 ▶ Command Prompt (CMD)
 - venv\Scripts\activate
 
@@ -33,8 +33,9 @@ If activation is successful, you should see:
 4. Install dependencies
 - pip install -r requirements.txt
 
-5️⃣ Verify installation
-- python -c "import cv2; import numpy; print('Setup successful')"
+5. Installing dlib
+- cd dlib
+- python -m pip install dlib-19.24.1-cp11-cp11-win_amd64.whl
 
 5. Verify installation
 - python -c "import cv2, numpy, dlib; print('OpenCV:', cv2.__version__); print('NumPy:', numpy.__version__); print('dlib:', dlib.__version__)"
