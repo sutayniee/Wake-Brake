@@ -1,17 +1,21 @@
 import cv2
 import dlib
 import numpy as np
+from pathlib import Path
+import sys
 
+model_path = (
+    Path(__file__).resolve().parent / "Models" / "shape_predictor_68_face_landmarks.dat"
+)
 
 class FaceLandmarkDetector:
     """
     A class for detecting 68 facial landmarks using dlib's pre-trained models.
 
     This class provides functionality to:
-    - Detect faces in an image using HOG + SVM
-    - Predict 68 facial landmarks for each face
+    - Predict 68 facial landmarks within a provided face ROI
     - Optionally draw connections between landmarks or just points
-    - Draw bounding boxes around detected faces
+    - Draw bounding boxes around provided face ROI
     - Compute distances between specific landmark points
     """
 
@@ -34,12 +38,12 @@ class FaceLandmarkDetector:
         Args:
             model_path (str): Path to the pre-trained dlib 68-point facial landmark model.
         """
-        self.face_detector = dlib.get_frontal_face_detector()
         self.landmark_predictor = dlib.shape_predictor(model_path)
 
     def detect_landmarks(
         self,
         image: np.ndarray,
+        face_bbox: tuple | None,
         draw_connections: bool = False,
         draw_points: bool = False,
         draw_rect: bool = False,
@@ -49,6 +53,7 @@ class FaceLandmarkDetector:
 
         Args:
             image (np.ndarray): The input BGR image.
+            face_bbox (tuple | None): Face ROI as (x, y, w, h) from Haar detector. If None, returns [].
             draw_connections (bool): Whether to draw lines between connected landmark points.
             draw_points (bool): Whether to draw landmark points as circles.
             draw_rect (bool): Whether to draw a bounding box around each detected face.
@@ -56,25 +61,55 @@ class FaceLandmarkDetector:
         Returns:
             List of np.ndarray: Each array is shape (68, 2) representing landmark coordinates for one face.
         """
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        self.detected_faces = self.face_detector(gray_image)
+        # dlib expects a contiguous 8-bit grayscale or RGB image.
+        if image is None:
+            return []
+        if hasattr(image, "get"):
+            image = image.get()
+        image = np.asarray(image)
+        if image.size == 0:
+            return []
+        if image.dtype != np.uint8:
+            image = np.clip(image, 0, 255).astype(np.uint8, copy=False)
+
+        if image.ndim == 2:
+            gray_image = image
+        elif image.ndim == 3 and image.shape[2] == 3:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        elif image.ndim == 3 and image.shape[2] == 4:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGRA2GRAY)
+        else:
+            return []
+
+        gray_image = np.ascontiguousarray(gray_image, dtype=np.uint8)
+        print(
+            f"[FaceLandmarkDetector] image type={type(image)} "
+            f"dtype={image.dtype} shape={getattr(image, 'shape', None)} "
+            f"gray dtype={gray_image.dtype} shape={gray_image.shape}"
+        )
 
         all_faces_landmarks = []
 
-        for face in self.detected_faces:
-            landmarks = self.landmark_predictor(gray_image, face)
-            landmark_points = np.zeros((68, 2), dtype=int)
+        if face_bbox is None:
+            h, w = gray_image.shape[:2]
+            rect = dlib.rectangle(left=0, top=0, right=w - 1, bottom=h - 1)
+        else:
+            x, y, w, h = face_bbox
+            rect = dlib.rectangle(left=x, top=y, right=x + w - 1, bottom=y + h - 1)
 
-            for i in range(68):
-                landmark_points[i] = (landmarks.part(i).x, landmarks.part(i).y)
-            all_faces_landmarks.append(landmark_points)
+        landmarks = self.landmark_predictor(gray_image, rect)
+        landmark_points = np.zeros((68, 2), dtype=int)
 
-            if draw_connections:
-                self._draw_landmark_connections(image, landmark_points)
-            if draw_points:
-                self._draw_landmark_points(image, landmark_points)
-            if draw_rect:
-                self._draw_bounding_box(image, face)
+        for i in range(68):
+            landmark_points[i] = (landmarks.part(i).x, landmarks.part(i).y)
+        all_faces_landmarks.append(landmark_points)
+
+        if draw_connections:
+            self._draw_landmark_connections(image, landmark_points)
+        if draw_points:
+            self._draw_landmark_points(image, landmark_points)
+        if draw_rect:
+            self._draw_bounding_box(image, rect)
 
         return all_faces_landmarks
 
@@ -144,7 +179,16 @@ def main():
     cap = cv2.VideoCapture(0)
 
     # Initialize the landmark detector
-    detector = FaceLandmarkDetector("../models/shape_predictor_68_face_landmarks.dat")
+    detector = FaceLandmarkDetector(str(model_path))
+
+    # Setup Haar cascade for face detection (ROI provider)
+    current_dir = Path(__file__).resolve().parent
+    haar_dir = current_dir.parent / "Haar_Cascade"
+    sys.path.append(str(haar_dir))
+    from Haar_Cascade_main import detect as haar_detect  # noqa: E402
+
+    cascade_path = haar_dir / "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(str(cascade_path))
 
     while True:
         ret, frame = cap.read()
@@ -153,9 +197,17 @@ def main():
 
         frame = cv2.flip(frame, 1)  # Flip horizontally for mirror view
 
+        # Detect face ROI with Haar cascade
+        frame, face_roi, face_bbox = haar_detect(frame, face_cascade, return_roi=True)
+        if face_bbox is None:
+            cv2.imshow("Live Face Landmark Detection", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+            continue
+
         # Detect and draw landmarks
         faces = detector.detect_landmarks(
-            frame, draw_connections=True, draw_points=False, draw_rect=True
+            frame, face_bbox, draw_connections=True, draw_points=False, draw_rect=True
         )
 
         # Example: measure eye height between two points (e.g. between eyebrow and eye)

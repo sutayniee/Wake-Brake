@@ -14,7 +14,13 @@ Requirements:
 
 import cv2
 import numpy as np
+from pathlib import Path
+import sys
 from Face_Landmark_Detector import FaceLandmarkDetector
+
+model_path = (
+    Path(__file__).resolve().parent / "Models" / "shape_predictor_68_face_landmarks.dat"
+)
 
 
 # Helper Functions
@@ -71,7 +77,16 @@ def main():
 
     # Initialize video capture and detector
     cap = cv2.VideoCapture(0)
-    detector = FaceLandmarkDetector("../Models/shape_predictor_68_face_landmarks.dat")
+    detector = FaceLandmarkDetector(str(model_path))
+
+    # Setup Haar cascade for face detection (ROI provider)
+    current_dir = Path(__file__).resolve().parent
+    haar_dir = current_dir.parent / "Haar_Cascade"
+    sys.path.append(str(haar_dir))
+    from Haar_Cascade_main import detect as haar_detect  # noqa: E402
+
+    cascade_path = haar_dir / "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(str(cascade_path))
 
     while True:
         ret, frame = cap.read()
@@ -80,8 +95,18 @@ def main():
 
         frame = cv2.flip(frame, 1)
 
+        # Detect face ROI with Haar cascade
+        frame, face_roi, face_bbox = haar_detect(frame, face_cascade, return_roi=True)
+        if face_bbox is None:
+            cv2.imshow("Drowsiness Detection", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+            continue
+
         # Detect facial landmarks and draw them on the frame
-        faces_landmarks = detector.detect_landmarks(frame, draw_connections=True)
+        faces_landmarks = detector.detect_landmarks(
+            frame, face_bbox, draw_connections=True
+        )
 
         if faces_landmarks:
             for face_landmarks in faces_landmarks:
