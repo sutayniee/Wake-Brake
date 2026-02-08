@@ -1,10 +1,12 @@
 import cv2
+import playsound3 as ps3
+import threading
 import time
 from pathlib import Path
 from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
 from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetector
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
-
+from Sample_Alarm.play_sound_alarm import play_alert
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -15,6 +17,8 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
+# Sound Alarm path
+Path_Alarm = "C:\\Users\eugen\Wake-Brake\src\Sample_Alarm\pogi-gising-na.mp3"
 
 # Load face cascades
 face_cascades = [
@@ -98,6 +102,7 @@ while True:
                         drowsy = True
                         put_text(img, "WAKE THE FUCK UP!!", (200, 220))
                         print("Drowsiness Detected!")
+                        play_alert(Path_Alarm)
                 else:
                     frame_counter = 0
                     drowsy = False
