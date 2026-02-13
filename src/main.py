@@ -1,6 +1,4 @@
 import cv2
-import playsound3 as ps3
-import threading
 import time
 from pathlib import Path
 from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
@@ -18,7 +16,7 @@ _CASCADE_PREDICTOR = (
     / "shape_predictor_68_face_landmarks.dat"
 )
 # Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
-Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
+# Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
@@ -102,7 +100,7 @@ while True:
                         drowsy = True
                         put_text(img, "Fatigue Detected!", (200, 220))
                         print("Drowsiness Detected!")
-                        play_alert(Path_Alarm)
+                        play_alert()
                 else:
                     frame_counter = 0
                     drowsy = False
