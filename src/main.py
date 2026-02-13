@@ -18,7 +18,7 @@ _CASCADE_PREDICTOR = (
     / "shape_predictor_68_face_landmarks.dat"
 )
 # Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
-Path_Alarm = "E:\THESIS\Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
+Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
