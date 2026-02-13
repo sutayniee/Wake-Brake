@@ -17,8 +17,8 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
-# Sound Alarm path
-Path_Alarm = "C:\\Users\eugen\Wake-Brake\src\Sample_Alarm\pogi-gising-na.mp3"
+# Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
+Path_Alarm = "E:\THESIS\Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
@@ -100,7 +100,7 @@ while True:
                     frame_counter += 1
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
                         drowsy = True
-                        put_text(img, "WAKE THE FUCK UP!!", (200, 220))
+                        put_text(img, "Fatigue Detected!", (200, 220))
                         print("Drowsiness Detected!")
                         play_alert(Path_Alarm)
                 else:

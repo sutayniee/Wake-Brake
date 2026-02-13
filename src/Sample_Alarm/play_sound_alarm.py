@@ -11,8 +11,8 @@ def play_sound(Path_Alarm):
     finally:
         with lock:
             alert_playing = False
-
-def play_alert(audio_path="pogi-gising-na.mp3"):
+#CHANGE MP3/XAV file to prefered sound
+def play_alert(audio_path="soundbeat.mp3"):
     global alert_playing
     with lock:
         if alert_playing:
