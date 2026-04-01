@@ -35,7 +35,7 @@ If activation is successful, you should see:
 
 5. Installing dlib
 - cd dlib
-- python -m pip install dlib-19.24.1-cp11-cp11-win_amd64.whl
+- python -m pip install dlib-19.24.1-cp311-cp311-win_amd64.whl
 
 5. Verify installation
 - python -c "import cv2, numpy, dlib; print('OpenCV:', cv2.__version__); print('NumPy:', numpy.__version__); print('dlib:', dlib.__version__)"
