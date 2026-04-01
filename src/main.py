@@ -16,12 +16,20 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
+# Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
+# Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
-    cv2.CascadeClassifier(str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_default.xml")),
-    cv2.CascadeClassifier(str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_alt.xml")),
-    cv2.CascadeClassifier(str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_alt2.xml")),
+    cv2.CascadeClassifier(
+        str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_default.xml")
+    ),
+    cv2.CascadeClassifier(
+        str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_alt.xml")
+    ),
+    cv2.CascadeClassifier(
+        str(_ROOT / "Algorithms" / "Haar_Cascade" /"Models" / "haarcascade_frontalface_alt2.xml")
+    ),
 ]
 
 # Initialize landmark detector
@@ -33,28 +41,30 @@ video_capture = cv2.VideoCapture(0)
 # FPS variables
 prev_time = 0
 fps = 0.0
-fps_smoothing = 0.9  
+fps_smoothing = 0.9  # higher = smoother FPS
 
 # EAR Configuration Parameters
-EAR_THRESHOLD = 0.30 
-CONSECUTIVE_FRAMES_THRESHOLD = 20 
-frame_counter = 0 
+EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
+CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
+frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
-arduino = None # Initialize variable safely
 
-# --- 1. CONNECT TO ARDUINO ---
+# Arduino communication added
+#  CONNECT TO ARDUINO FOR MULTIMODAL ALERTS
 try:
-    print("Connecting to Arduino on COM4...")
-    arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
-    
-    # CRITICAL FIX: The Arduino resets when Serial connects. 
-    # We MUST wait 2 seconds for it to finish booting before sending data.
-    time.sleep(2) 
-    print("Arduino Connected successfully!")
-except Exception as e:
-    print(f"Arduino connection failed: {e}")
+    arduino = serial.Serial(port='COM', baudrate=9600, timeout=0.1)
+except:
+    print("Arduino not connected or wrong port!")
 
-# Start Video Capture Loop
+# --- Inside your Drowsiness Check Loop ---
+if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
+    drowsy = True
+    arduino.write(b'1')  # Send '1' to Arduino to trigger alarm
+    play_alert()
+else:
+    arduino.write(b'0')  # Send '0' to turn it off
+
+# Start Video Capture
 while True:
     ret, img = video_capture.read()
     if not ret:
@@ -62,53 +72,64 @@ while True:
 
     img = cv2.flip(img, 1)
 
-    # Face detection
+    # Face detection using Haar Cascade and extracting ROI (Region of Interest)
     img, face_roi, face_bbox = detect_face(img, face_cascades, return_roi=True)
 
+    # Keeps looking for detected Face
     if face_bbox is not None:
+        # Detect Facial Landmarks and draw on them
         faces_landmarks = detector.detect_landmarks(
-            img, face_bbox, draw_connections=True, draw_points=False, draw_rect=False
+            img,
+            face_bbox,
+            draw_connections=True,
+            draw_points=False,
+            draw_rect=False,
         )
 
         if faces_landmarks:
             for landmarks in faces_landmarks:
-                point1 = landmarks[19]  
-                point2 = landmarks[41]  
+                # Extracting eye landmarks for left eyebrow and eye to calculate eye height
+                point1 = landmarks[19]  # left eyebrow
+                point2 = landmarks[41]  # left eye
                 distance = detector.calculate_distance(point1, point2)
 
+                # Eye indices from face_landmark_detector
                 right_eye_idxs = detector.FACIAL_LANDMARKS_IDXS["right_eye"]
                 left_eye_idxs = detector.FACIAL_LANDMARKS_IDXS["left_eye"]
 
+                # Extract eye coordinates
                 right_eye = landmarks[right_eye_idxs[0] : right_eye_idxs[1]]
                 left_eye_ = landmarks[left_eye_idxs[0] : left_eye_idxs[1]]
 
+                # Computer EAR
                 right_ear = eye_aspect_ratio(right_eye)
                 left_ear = eye_aspect_ratio(left_eye_)
                 ear = (left_ear + right_ear) / 2.0
 
+                # Print EAR
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
 
-                # --- 2. THE ARDUINO LOGIC INSIDE THE LOOP ---
+                #Drowsiness check
                 if ear < EAR_THRESHOLD:
                     frame_counter += 1
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-                        if not drowsy: # State change: Awake -> Drowsy
-                            if arduino:
-                                arduino.write(b'1') # Send '1' ONLY ONCE when crossing threshold
                         drowsy = True
                         put_text(img, "Fatigue Detected!", (200, 220))
+                        print("Drowsiness Detected!")
                         play_alert()
                 else:
-                    if drowsy: # State change: Drowsy -> Awake
-                        if arduino:
-                            arduino.write(b'0') # Send '0' ONLY ONCE when waking up
                     frame_counter = 0
                     drowsy = False
                       
                 # Print Eye Height
                 cv2.putText(
-                    img, f"Eye Height: {distance:.2f}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2,
+                    img,
+                    f"Eye Height: {distance:.2f}",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 0, 0),
+                    2,
                 )
 
     # FPS calculation
@@ -120,21 +141,22 @@ while True:
         current_fps = 1.0 / dt
         fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
 
+    # FPS display (upper-right)
     h, w = img.shape[:2]
     cv2.putText(
-        img, f"FPS: {fps:.1f}", (w - 150, 30),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2,
+        img,
+        f"FPS: {fps:.1f}",
+        (w - 150, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 255),
+        2,
     )
 
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
-
-# --- 3. CLEANUP ---
-if arduino:
-    arduino.write(b'0') # Ensure alarm is off when quitting
-    arduino.close()     # Close serial port cleanly
 
 video_capture.release()
 cv2.destroyAllWindows()
