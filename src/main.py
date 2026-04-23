@@ -6,6 +6,7 @@ from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
 from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetector
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
 from Sample_Alarm.play_sound_alarm import play_alert
+from Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -38,6 +39,11 @@ detector = FaceLandmarkDetector(str(_CASCADE_PREDICTOR))
 # Video capture
 video_capture = cv2.VideoCapture(0)
 
+# Arduino communication 
+# CONNECT TO ARDUINO FOR MULTIMODAL ALERTS
+check_arduino_connection()
+# if an error occured due to wrong port, change them in Arduino.Arduino_signal def check_arduino_connection
+
 # FPS variables
 prev_time = 0
 fps = 0.0
@@ -48,22 +54,6 @@ EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
 CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
 frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
-
-# Arduino communication added
-#  CONNECT TO ARDUINO FOR MULTIMODAL ALERTS
-try:
-    arduino = serial.Serial(port='COM', baudrate=9600, timeout=0.1)
-except:
-    print("Arduino not connected or wrong port!")
-
-# --- Inside your Drowsiness Check Loop ---
-if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-    drowsy = True
-    arduino.write(b'1')  # Send '1' to Arduino to trigger alarm
-    play_alert()
-else:
-    arduino.write(b'0')  # Send '0' to turn it off
-
 # Start Video Capture
 while True:
     ret, img = video_capture.read()
@@ -72,6 +62,15 @@ while True:
 
     img = cv2.flip(img, 1)
 
+    # FPS calculation
+    current_time = time.time()
+    dt = current_time - prev_time
+    prev_time = current_time
+
+    if dt > 0:
+        current_fps = 1.0 / dt
+        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
+    
     # Face detection using Haar Cascade and extracting ROI (Region of Interest)
     img, face_roi, face_bbox = detect_face(img, face_cascades, return_roi=True)
 
@@ -110,16 +109,22 @@ while True:
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
 
                 #Drowsiness check
+                ctime = time.time()
                 if ear < EAR_THRESHOLD:
                     frame_counter += 1
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
                         drowsy = True
                         put_text(img, "Fatigue Detected!", (200, 220))
-                        print("Drowsiness Detected!")
-                        play_alert()
+                        print("Drowsiness Detected! ", time.ctime())
+                        send_to_arduino('1') # Arduino alert
+                        play_alert()         # PC fallback alert
+                        
                 else:
-                    frame_counter = 0
+                    if drowsy:
+                        send_to_arduino('0') # turn off Arduino alert
                     drowsy = False
+                    frame_counter = 0
+                    print("Driver Alerted! ", time.ctime())
                       
                 # Print Eye Height
                 cv2.putText(
@@ -131,15 +136,6 @@ while True:
                     (255, 0, 0),
                     2,
                 )
-
-    # FPS calculation
-    current_time = time.time()
-    dt = current_time - prev_time
-    prev_time = current_time
-
-    if dt > 0:
-        current_fps = 1.0 / dt
-        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
 
     # FPS display (upper-right)
     h, w = img.shape[:2]
