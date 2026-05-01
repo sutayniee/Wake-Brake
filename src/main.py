@@ -108,23 +108,31 @@ while True:
                 # Print EAR
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
 
-                #Drowsiness check
+                # Drowsiness check
                 ctime = time.time()
+
                 if ear < EAR_THRESHOLD:
                     frame_counter += 1
+
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-                        drowsy = True
+                        # STATE CHANGE: Awake -> Drowsy
+                        if not drowsy:
+                            drowsy = True
+                            print("Drowsiness Detected!", time.ctime())
+                            send_to_arduino('1')  # Trigger Arduino once
+
+                        # CONTINUOUS ACTION (runs every frame while drowsy)
                         put_text(img, "Fatigue Detected!", (200, 220))
-                        print("Drowsiness Detected! ", time.ctime())
-                        send_to_arduino('1') # Arduino alert
-                        play_alert()         # PC fallback alert
-                        
+                        play_alert()  # Keeps playing every frame
+
                 else:
+                    # STATE CHANGE: Drowsy -> Awake
                     if drowsy:
-                        send_to_arduino('0') # turn off Arduino alert
+                        print("Driver Alerted!", time.ctime())
+                        send_to_arduino('0')  # Turn off alert once
+
                     drowsy = False
                     frame_counter = 0
-                    print("Driver Alerted! ", time.ctime())
                       
                 # Print Eye Height
                 cv2.putText(
