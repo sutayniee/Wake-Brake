@@ -127,7 +127,7 @@ while True:
                             drowsy = True
                             print("Drowsiness Detected!", time.ctime())
                             send_to_arduino('1')  # Trigger Arduino once
-                            fatigue_level = 'HIGH' 
+                            fatigue_level = "HIGH"
                         
                         # CONTINUOUS ACTION (runs every frame while drowsy)
                         put_text(img, "Fatigue Detected!", (200, 220))
@@ -138,7 +138,7 @@ while True:
                     if drowsy:
                         print("Driver Alerted!", time.ctime())
                         send_to_arduino('0')  # Turn off alert once
-                        fatigue_level = 'LOW'
+                        fatigue_level = "LOW"
                     drowsy = False
                     frame_counter = 0
                       
