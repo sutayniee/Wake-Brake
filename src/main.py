@@ -22,8 +22,6 @@ _CASCADE_PREDICTOR = (
     / "shape_predictor_68_face_landmarks.dat"
 )
 
-
-
 # Load face cascades
 face_cascades = [
     cv2.CascadeClassifier(
