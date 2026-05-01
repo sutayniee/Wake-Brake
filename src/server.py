@@ -1,63 +1,131 @@
 import time
 import cv2
 from flask import Flask, jsonify, Response
-from shared_state import fatigue_level, output_frame, lock
+import shared_state  # IMPORTANT: import the module, not the variables
 
 app = Flask(__name__)
 
-# -------- VIDEO STREAM --------
+# ----------------------------------
+# VIDEO STREAM
+# ----------------------------------
 def generate_frames():
-    global output_frame
-
     while True:
-        with lock:
-            if output_frame is None:
+        with shared_state.lock:
+            if shared_state.output_frame is None:
                 continue
 
-            _, buffer = cv2.imencode('.jpg', output_frame)
+            # encode frame as jpg
+            ret, buffer = cv2.imencode('.jpg', shared_state.output_frame)
+            if not ret:
+                continue
+
             frame_bytes = buffer.tobytes()
 
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               frame_bytes + b'\r\n')
+        yield (
+            b'--frame\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' +
+            frame_bytes +
+            b'\r\n'
+        )
 
-# -------- ROUTES --------
+
+# ----------------------------------
+# FATIGUE JSON API
+# ----------------------------------
 @app.route('/fatigue')
 def get_fatigue():
-    return jsonify({"level": fatigue_level})
+    return jsonify({
+        "level": shared_state.fatigue_level
+    })
 
+
+# ----------------------------------
+# VIDEO ROUTE
+# ----------------------------------
 @app.route('/video')
 def video():
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_frames(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
+
+# ----------------------------------
+# LIVE STATUS STREAM (AUTO UPDATE)
+# ----------------------------------
 @app.route('/stream')
 def stream():
     def generate():
+        last_value = ""
+
         while True:
-            yield f"data: {fatigue_level}\n\n"
+            current_value = shared_state.fatigue_level
+
+            # only send update if changed
+            if current_value != last_value:
+                yield f"data: {current_value}\n\n"
+                last_value = current_value
+
             time.sleep(1)
 
-    return app.response_class(generate(), mimetype='text/event-stream')
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
+
+# ----------------------------------
+# WEB PAGE
+# ----------------------------------
 @app.route('/')
 def index():
     return """
     <html>
-    <body style="text-align:center;">
+    <head>
+        <title>Wake&Brake Live Monitor</title>
+    </head>
+    <body style="text-align:center; font-family:Arial;">
+
         <h1>Wake&Brake Live Monitor</h1>
-        <h2 id="status">Waiting...</h2>
-        <img src="/video" width="640"/>
+
+        <h2 id="status">Waiting for detection...</h2>
+
+        <img src="/video" width="640" style="border:2px solid black;"/>
 
         <script>
-            var source = new EventSource("/stream");
+            const source = new EventSource("/stream");
+
             source.onmessage = function(event) {
-                document.getElementById("status").innerHTML = event.data;
+                document.getElementById("status").innerHTML =
+                    "Fatigue Level: " + event.data;
+            };
+
+            source.onerror = function(error) {
+                console.log("Stream error:", error);
             };
         </script>
+
     </body>
     </html>
     """
 
+
+# ----------------------------------
+# RUN SERVER
+# ----------------------------------
 def run_server():
-    app.run(host="0.0.0.0", port=5000)
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False,
+        threaded=True
+    )
+
+
+if __name__ == "__main__":
+    run_server()

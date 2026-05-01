@@ -9,7 +9,7 @@ from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetec
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
 from Sample_Alarm.play_sound_alarm import play_alert
 from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
-from shared_state import fatigue_level, output_frame, lock
+import shared_state
 from server import run_server
 
 # Paths
@@ -127,7 +127,7 @@ while True:
                             drowsy = True
                             print("Drowsiness Detected!", time.ctime())
                             send_to_arduino('1')  # Trigger Arduino once
-                            fatigue_level = "HIGH"
+                            shared_state.fatigue_level = "HIGH"
                         
                         # CONTINUOUS ACTION (runs every frame while drowsy)
                         put_text(img, "Fatigue Detected!", (200, 220))
@@ -138,7 +138,7 @@ while True:
                     if drowsy:
                         print("Driver Alerted!", time.ctime())
                         send_to_arduino('0')  # Turn off alert once
-                        fatigue_level = "LOW"
+                        shared_state.fatigue_level = "LOW"
                     drowsy = False
                     frame_counter = 0
                       
@@ -166,8 +166,8 @@ while True:
     )
 
     # video in mobile
-    with lock:
-        output_frame = img.copy()
+    with shared_state.lock:
+        shared_state.output_frame = img.copy()
 
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
