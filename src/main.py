@@ -1,12 +1,16 @@
 import serial
 import cv2
 import time
+import threading
+from flask import Flask, jsonify, Response
 from pathlib import Path
 from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
 from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetector
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
 from Sample_Alarm.play_sound_alarm import play_alert
-from Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
+from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
+from shared_state import fatigue_level, output_frame, lock
+from server import run_server
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -17,8 +21,8 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
-# Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
-# Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
+
+
 
 # Load face cascades
 face_cascades = [
@@ -54,6 +58,10 @@ EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
 CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
 frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
+
+# Start Server
+threading.Thread(target=run_server, daemon=True).start()
+
 # Start Video Capture
 while True:
     ret, img = video_capture.read()
@@ -110,7 +118,6 @@ while True:
 
                 # Drowsiness check
                 ctime = time.time()
-
                 if ear < EAR_THRESHOLD:
                     frame_counter += 1
 
@@ -120,7 +127,8 @@ while True:
                             drowsy = True
                             print("Drowsiness Detected!", time.ctime())
                             send_to_arduino('1')  # Trigger Arduino once
-
+                            fatigue_level = 'HIGH' 
+                        
                         # CONTINUOUS ACTION (runs every frame while drowsy)
                         put_text(img, "Fatigue Detected!", (200, 220))
                         play_alert()  # Keeps playing every frame
@@ -130,7 +138,7 @@ while True:
                     if drowsy:
                         print("Driver Alerted!", time.ctime())
                         send_to_arduino('0')  # Turn off alert once
-
+                        fatigue_level = 'LOW'
                     drowsy = False
                     frame_counter = 0
                       
@@ -156,6 +164,10 @@ while True:
         (0, 255, 255),
         2,
     )
+
+    # video in mobile
+    with lock:
+        output_frame = img.copy()
 
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
