@@ -9,6 +9,7 @@ from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetec
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
 from Sample_Alarm.play_sound_alarm import play_alert
 from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
+from Algorithms.Blink_Rate.Blink_Rate_main import BlinkRateDetector
 import shared_state
 from server import run_server
 
@@ -56,6 +57,13 @@ EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
 CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
 frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
+
+# Blink rate Configuration Parameters
+blink_detector = BlinkRateDetector(
+    threshold=EAR_THRESHOLD,
+    min_frames_closed=2,   # IMPORTANT for 15 FPS
+    window_seconds=30      # shorter window = more responsive
+)
 
 # Start Server
 threading.Thread(target=run_server, daemon=True).start()
@@ -111,6 +119,10 @@ while True:
                 left_ear = eye_aspect_ratio(left_eye_)
                 ear = (left_ear + right_ear) / 2.0
 
+                # Print Blink Rate
+                blink_rate = blink_detector.update(ear)
+                put_text(img, f"BPM: {blink_rate:.1f}", (10, 90), color=(255, 255, 0))
+
                 # Print EAR
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
 
@@ -120,15 +132,22 @@ while True:
                     frame_counter += 1
 
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-                        # STATE CHANGE: Awake -> Drowsy
-                        if not drowsy:
-                            drowsy = True
-                            print("Drowsiness Detected!", time.ctime())
-                            send_to_arduino('1')  # Trigger Arduino once
-                            shared_state.fatigue_level = "HIGH"
+
+                        fatigue_score = 2
+
+                        if blink_rate < 10:
+                            fatigue_score += 1
+
+                        if fatigue_score >= 2:
+                            # STATE CHANGE: Awake -> Drowsy
+                            if not drowsy:
+                                drowsy = True
+                                print("Drowsiness Detected!", time.ctime())
+                                send_to_arduino('1')  # Trigger Arduino once
+                                shared_state.fatigue_level = "HIGH"
                         
                         # CONTINUOUS ACTION (runs every frame while drowsy)
-                        put_text(img, "Fatigue Detected!", (200, 220))
+                        put_text(img, "Fatigue Detected!", (200, 100))
                         play_alert()  # Keeps playing every frame
 
                 else:
