@@ -53,7 +53,7 @@ fps = 0.0
 fps_smoothing = 0.9  # higher = smoother FPS
 
 # EAR Configuration Parameters
-EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
+EAR_THRESHOLD = 0.27 # Below this, eyes are considered closed
 CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
 frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
