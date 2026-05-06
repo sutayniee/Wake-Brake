@@ -8,7 +8,6 @@ The system uses computer vision techniques to monitor visual fatigue indicators 
 - OpenCV
 - NumPy
 - dlib 
-- pyserial
 
 1. Clone the repository
 - git clone https://github.com/sutayniee/Wake-Brake.git
@@ -45,32 +44,6 @@ If activation is successful, you should see:
 - Press Ctrl + Shift + P
 - Select Python: Select Interpreter
 - Choose the interpreter inside the venv folder
-
-💿 Arduino IDE Setup (Firmware)
-
-Installation
-1. Download the IDE Go to the Official Arduino Website (https://www.arduino.cc/en/software) and download *Arduino IDE 2.0* (or higher) for Windows.
-
-2. Install: Run the .exe and follow the prompts. Ensure you allow the installation of "USB Drivers" if Windows asks.
-
-3. Install LiquidCrystal I2C Library:
-   - Open Arduino IDE.
-   - Go to Sketch > Include Library > Manage Libraries...
-   - Search for *"LiquidCrystal I2C"* by Frank de Brabander.
-   - Click Install.
-
-
-Uploading the Code
-1. Connect: Plug your Arduino Uno into your laptop via USB.
-
-2. Open Firmware: In the Arduino IDE, go to File > Open and select the .ino file located in `arduino_code/` folder.
-Note: You can either open the .ino file directly from the arduino_code/ folder or simply copy-paste the code from VS Code into a new sketch in the Arduino IDE. Ensure the previous default code is deleted before pasting and saving.
-
-3. Select Board & Port:
-   - Go to Tools > Board and select Arduino Uno.
-   - Go to Tools > Port and select the active COM port (e.g., COM4).
-4. Upload: Click the Upload arrow button (top left).
-
 
 🔁 Basic Git Commands (Quick Reference)
 Check repository status
