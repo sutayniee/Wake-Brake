@@ -1,10 +1,17 @@
+import serial
 import cv2
 import time
+import threading
+from flask import Flask, jsonify, Response
 from pathlib import Path
 from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
 from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetector
 from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, put_text
 from Sample_Alarm.play_sound_alarm import play_alert
+from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
+from Algorithms.Blink_Rate.Blink_Rate_main import BlinkRateDetector
+import shared_state
+from server import run_server
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -15,8 +22,6 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
-# Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
-# Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
@@ -37,16 +42,31 @@ detector = FaceLandmarkDetector(str(_CASCADE_PREDICTOR))
 # Video capture
 video_capture = cv2.VideoCapture(0)
 
+# Arduino communication 
+# CONNECT TO ARDUINO FOR MULTIMODAL ALERTS
+check_arduino_connection()
+# if an error occured due to wrong port, change them in Arduino.Arduino_signal def check_arduino_connection
+
 # FPS variables
 prev_time = 0
 fps = 0.0
 fps_smoothing = 0.9  # higher = smoother FPS
 
 # EAR Configuration Parameters
-EAR_THRESHOLD = 0.30 # Below this, eyes are considered closed
+EAR_THRESHOLD = 0.27 # Below this, eyes are considered closed
 CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
 frame_counter = 0 # Counter for consecutive closed-eye frames
 drowsy = False
+
+# Blink rate Configuration Parameters
+blink_detector = BlinkRateDetector(
+    threshold=EAR_THRESHOLD,
+    min_frames_closed=2,   # IMPORTANT for 15 FPS
+    window_seconds=30      # shorter window = more responsive
+)
+
+# Start Server
+threading.Thread(target=run_server, daemon=True).start()
 
 # Start Video Capture
 while True:
@@ -56,6 +76,15 @@ while True:
 
     img = cv2.flip(img, 1)
 
+    # FPS calculation
+    current_time = time.time()
+    dt = current_time - prev_time
+    prev_time = current_time
+
+    if dt > 0:
+        current_fps = 1.0 / dt
+        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
+    
     # Face detection using Haar Cascade and extracting ROI (Region of Interest)
     img, face_roi, face_bbox = detect_face(img, face_cascades, return_roi=True)
 
@@ -90,20 +119,45 @@ while True:
                 left_ear = eye_aspect_ratio(left_eye_)
                 ear = (left_ear + right_ear) / 2.0
 
+                # Print Blink Rate
+                blink_rate = blink_detector.update(ear)
+                put_text(img, f"BPM: {blink_rate:.1f}", (10, 90), color=(255, 255, 0))
+
                 # Print EAR
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
 
-                #Drowsiness check
+                # Drowsiness check
+                ctime = time.time()
                 if ear < EAR_THRESHOLD:
                     frame_counter += 1
+
                     if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-                        drowsy = True
-                        put_text(img, "Fatigue Detected!", (200, 220))
-                        print("Drowsiness Detected!")
-                        play_alert()
+
+                        fatigue_score = 2
+
+                        if blink_rate < 10:
+                            fatigue_score += 1
+
+                        if fatigue_score >= 2:
+                            # STATE CHANGE: Awake -> Drowsy
+                            if not drowsy:
+                                drowsy = True
+                                print("Drowsiness Detected!", time.ctime())
+                                send_to_arduino('1')  # Trigger Arduino once
+                                shared_state.fatigue_level = "HIGH"
+                        
+                        # CONTINUOUS ACTION (runs every frame while drowsy)
+                        put_text(img, "Fatigue Detected!", (200, 100))
+                        play_alert()  # Keeps playing every frame
+
                 else:
-                    frame_counter = 0
+                    # STATE CHANGE: Drowsy -> Awake
+                    if drowsy:
+                        print("Driver Alerted!", time.ctime())
+                        send_to_arduino('0')  # Turn off alert once
+                        shared_state.fatigue_level = "LOW"
                     drowsy = False
+                    frame_counter = 0
                       
                 # Print Eye Height
                 cv2.putText(
@@ -116,15 +170,6 @@ while True:
                     2,
                 )
 
-    # FPS calculation
-    current_time = time.time()
-    dt = current_time - prev_time
-    prev_time = current_time
-
-    if dt > 0:
-        current_fps = 1.0 / dt
-        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
-
     # FPS display (upper-right)
     h, w = img.shape[:2]
     cv2.putText(
@@ -136,6 +181,10 @@ while True:
         (0, 255, 255),
         2,
     )
+
+    # video in mobile
+    with shared_state.lock:
+        shared_state.output_frame = img.copy()
 
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
