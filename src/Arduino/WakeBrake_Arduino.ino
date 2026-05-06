@@ -1,83 +1,124 @@
-#include <Wire.h> 
-#include <LiquidCrystal_I2C.h>
+// Pins based on your configuration
+const int buzzerPin = 7;
+const int vibrationPin =
+    2; // Recommended: Use a PWM pin like D3 if you want intensity control
+const int diffuserPin = 8;
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// Timing Constants (in milliseconds)
+const unsigned long scentOnDuration = 30000;  // 30 seconds
+const unsigned long scentOffDuration = 90000; // 90 seconds
 
-// Pin Definitions
-const int buzzerPin = 7; 
-const int buzzerNeg = 4; 
-const int MoPin = 2;    
+// Scent State Machine Definition
+enum ScentState {
+  IDLE,
+  SPRAYING,
+  COOLDOWN
+};
 
-// Global state variables
-bool isDrowsy = false;
-bool lastState = true; // Set to true so it forces an update on the very first loop
+// Global State Variables
+bool fatigueActive = false;
+ScentState currentScentState = IDLE;
+unsigned long scentStartTime = 0;
+
+// Feature Toggles (Can be updated via Serial from your Mobile App)
+bool useBuzzer = true;
+bool useVibration = true;
+bool useScent = true;
 
 void setup() {
-  lcd.init();
-  lcd.backlight();
-  
+  Serial.begin(9600);
   pinMode(buzzerPin, OUTPUT);
-  pinMode(buzzerNeg, OUTPUT);
-  digitalWrite(buzzerNeg, LOW); // Acting as GND
-  pinMode(MoPin, OUTPUT);  
-  
-  // High-speed communication with Python
-  Serial.begin(9600); 
+  pinMode(vibrationPin, OUTPUT);
+  pinMode(diffuserPin, OUTPUT);
 
-  // Startup sequence
-  lcd.setCursor(0, 0);
-  lcd.print(" WAKE & BRAKE  ");
-  lcd.setCursor(0, 1);
-  lcd.print(" AI CAM ACTIVE ");
-  delay(2000);
-  lcd.clear();
+  Serial.println("Wake&Brake System Ready - FSM Mode Active");
 }
 
 void loop() {
-  // 1. --- Listen for Python Signal ---
+  handleSerialInput();
+
+  if (fatigueActive) {
+    executeAlerts();
+  } else {
+    stopAllAlerts();
+  }
+
+  // Scent cycle runs independently of fatigueActive to enforce the Locked Cycle
+  handleScentCycle();
+}
+
+void handleSerialInput() {
   if (Serial.available() > 0) {
-    char data = Serial.read();
-    
-    // Clear out any extra characters in the buffer (like newline characters)
-    while(Serial.available() > 0) { Serial.read(); } 
-    
-    if (data == '1') {
-      isDrowsy = true;
+    char cmd = Serial.read();
+    Serial.print("Received: "); Serial.println(cmd); // Debugging
+
+    if (cmd == 'S') { // SEVERE - Scent trigger
+      fatigueActive = true;
+      useBuzzer = true; useVibration = true;
+      // Trigger the locked cycle if it's currently idle
+      if (currentScentState == IDLE) {
+          Serial.println("SCENT: Triggering Active Spray (30s)");
+          currentScentState = SPRAYING;
+          scentStartTime = millis();
+          digitalWrite(diffuserPin, HIGH);
+      }
     } 
-    else if (data == '0') {
-      isDrowsy = false;
+    else if (cmd == 'B') { // CRITICAL - Buzzer and Vibration
+      fatigueActive = true;
+      useBuzzer = true; useVibration = true;
+    }
+    else if (cmd == 'H') { // WARNING - Haptic Only
+      fatigueActive = true;
+      useBuzzer = false; useVibration = true;
+    }
+    else if (cmd == 'N' || cmd == '0') { // SAFE
+      fatigueActive = false;
+      // stopAllAlerts() will be called in loop, but scent will continue!
     }
   }
+}
 
-  // 2. --- Display and Hardware Logic (ONLY UPDATES IF STATE CHANGES) ---
-  if (isDrowsy != lastState) {
-    
-    if (isDrowsy) {
-      // --- Alert State ---
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("!!! DROWSY !!!  "); 
-      lcd.setCursor(0, 1);
-      lcd.print("   WAKE UP!     ");
+void executeAlerts() {
+  // 1. Immediate Alerts (Auditory and Haptic)
+  if (useBuzzer)
+    digitalWrite(buzzerPin, HIGH);
+  if (useVibration)
+    digitalWrite(vibrationPin, HIGH);
+}
 
-      digitalWrite(buzzerPin, HIGH); 
-      digitalWrite(MoPin, HIGH);     
-    } 
-    else {
-      // --- Normal State ---
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("  DRIVING MODE  "); 
-      lcd.setCursor(0, 1);
-      lcd.print("STATUS: ALERT   ");
-      
-      digitalWrite(buzzerPin, LOW);
-      digitalWrite(MoPin, LOW);      
-    }
-    
-    // Save the current state so we don't update again until it changes
-    lastState = isDrowsy; 
+void handleScentCycle() {
+  // 2. Pulsed Olfactory State Machine (30s ON / 90s OFF Locked Cycle)
+  unsigned long currentTime = millis();
+
+  switch (currentScentState) {
+    case IDLE:
+      digitalWrite(diffuserPin, LOW); // Ensure it stays OFF
+      break;
+
+    case SPRAYING:
+      digitalWrite(diffuserPin, HIGH); // Ensure it stays ON
+      if (currentTime - scentStartTime >= scentOnDuration) {
+        // Transition to COOLDOWN
+        Serial.println("SCENT: Entering Cooldown Lockout (90s)");
+        currentScentState = COOLDOWN;
+        scentStartTime = currentTime;
+        digitalWrite(diffuserPin, LOW);
+      }
+      break;
+
+    case COOLDOWN:
+      digitalWrite(diffuserPin, LOW); // Ensure it stays OFF
+      if (currentTime - scentStartTime >= scentOffDuration) {
+        // Transition back to IDLE
+        Serial.println("SCENT: Cooldown Complete. Ready.");
+        currentScentState = IDLE;
+      }
+      break;
   }
-  
-  delay(10); // Keep the small delay for loop stability
+}
+
+void stopAllAlerts() {
+  digitalWrite(buzzerPin, LOW);
+  digitalWrite(vibrationPin, LOW);
+  // diffuserPin is NOT turned off here! It is managed exclusively by handleScentCycle()
 }
