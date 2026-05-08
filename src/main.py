@@ -177,7 +177,7 @@ while True:
                 else:
                     # STATE CHANGE: Drowsy -> Awake
                     if drowsy:
-                        print("Driver Alerted!", time.ctime())
+                        print("Driver is now Awake", time.ctime())
                         send_to_arduino('0')  # Turn off alert once
                         shared_state.fatigue_level = "LOW"
                     drowsy = False
