@@ -68,6 +68,8 @@ blink_detector = BlinkRateDetector(
 # Start Server
 threading.Thread(target=run_server, daemon=True).start()
 
+last_debug_print = 0
+DEBUG_INTERVAL = 3
 # Start Video Capture
 while True:
     ret, img = video_capture.read()
@@ -84,9 +86,12 @@ while True:
     if dt > 0:
         current_fps = 1.0 / dt
         fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
+        #Sharing FPS to flask 
+        shared_state.fps_value = round(fps, 1)
     
     # Face detection using Haar Cascade and extracting ROI (Region of Interest)
     img, face_roi, face_bbox = detect_face(img, face_cascades, return_roi=True)
+    blink_rate = 0.0
 
     # Keeps looking for detected Face
     if face_bbox is not None:
@@ -101,10 +106,14 @@ while True:
 
         if faces_landmarks:
             for landmarks in faces_landmarks:
+                #Sharing distance to Flask
+                shared_state.bpm_value = round(blink_rate, 1)
                 # Extracting eye landmarks for left eyebrow and eye to calculate eye height
                 point1 = landmarks[19]  # left eyebrow
                 point2 = landmarks[41]  # left eye
                 distance = detector.calculate_distance(point1, point2)
+                #Sharing distance to Flask
+                shared_state.eye_height_value = round(distance, 2)
 
                 # Eye indices from face_landmark_detector
                 right_eye_idxs = detector.FACIAL_LANDMARKS_IDXS["right_eye"]
@@ -118,9 +127,24 @@ while True:
                 right_ear = eye_aspect_ratio(right_eye)
                 left_ear = eye_aspect_ratio(left_eye_)
                 ear = (left_ear + right_ear) / 2.0
+                #Sending EAR to Flask
+                shared_state.ear_value = round(ear, 2)
 
                 # Print Blink Rate
                 blink_rate = blink_detector.update(ear)
+                #Sharing blink rate to flask
+                shared_state.bpm_value = round(blink_rate, 1)
+                if time.time() - last_debug_print > DEBUG_INTERVAL:
+
+                     print(
+                        "STATE:",
+                        shared_state.ear_value,
+                        shared_state.eye_height_value,
+                        shared_state.fps_value,
+                        shared_state.bpm_value
+                                                 )
+                     last_debug_print = time.time()
+
                 put_text(img, f"BPM: {blink_rate:.1f}", (10, 90), color=(255, 255, 0))
 
                 # Print EAR

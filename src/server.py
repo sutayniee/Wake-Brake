@@ -34,9 +34,15 @@ def generate_frames():
 # ----------------------------------
 @app.route('/fatigue')
 def get_fatigue():
-    return jsonify({
-        "level": shared_state.fatigue_level
-    })
+
+    with shared_state.lock:
+        return jsonify({
+            "level": shared_state.fatigue_level,
+            "ear": shared_state.ear_value,
+            "eye_height": shared_state.eye_height_value,
+            "fps": shared_state.fps_value,
+            "bpm": shared_state.bpm_value
+        })
 
 
 # ----------------------------------
@@ -87,15 +93,18 @@ def index():
     return """
     <html>
     <head>
-        <title>Wake&Brake Live Monitor</title>
+        <title>Wake&Brake Monitor</title>
     </head>
+
     <body style="text-align:center; font-family:Arial;">
 
         <h1>Wake&Brake Live Monitor</h1>
 
-        <h2 id="status">Waiting for detection...</h2>
+        <h2 id="status">Loading...</h2>
 
-        <img src="/video" width="640" style="border:2px solid black;"/>
+        <p id="metrics">FPS: -- | EAR: -- | BPM: -- | Eye Height: --</p>
+
+        <img src="/video" width="640" style="border:2px solid black;" />
 
         <script>
             const source = new EventSource("/stream");
@@ -105,9 +114,18 @@ def index():
                     "Fatigue Level: " + event.data;
             };
 
-            source.onerror = function(error) {
-                console.log("Stream error:", error);
-            };
+            setInterval(async () => {
+                const res = await fetch("/fatigue");
+                const data = await res.json();
+
+                document.getElementById("metrics").innerHTML =
+                    "FPS: " + data.fps +
+                    " | EAR: " + data.ear +
+                    " | BPM: " + data.bpm +
+                    " | Eye Height: " + data.eye_height;
+
+            }, 500);
+
         </script>
 
     </body>
