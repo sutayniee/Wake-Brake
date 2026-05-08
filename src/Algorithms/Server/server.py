@@ -2,6 +2,7 @@ import time
 import cv2
 from flask import Flask, jsonify, Response
 import Algorithms.Server.shared_state as shared_state  # IMPORTANT: import the module, not the variables
+import socket
 
 app = Flask(__name__)
 
@@ -131,14 +132,27 @@ def index():
     </body>
     </html>
     """
-
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))  # doesn't actually send data
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
 
 # ----------------------------------
 # RUN SERVER
 # ----------------------------------
 def run_server():
     import logging
-    logging.getLogger('werkzeug').disabled = True
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
+    ip = get_local_ip()
+
+    print(f"\nServer running on:")
+    print(f"  http://127.0.0.1:5000")
+    print(f"  http://{ip}:5000\n")
 
     app.run(
         host="0.0.0.0",
