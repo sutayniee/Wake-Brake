@@ -1,7 +1,7 @@
 import time
 import cv2
 from flask import Flask, jsonify, Response
-import shared_state  # IMPORTANT: import the module, not the variables
+import Algorithms.Server.shared_state as shared_state  # IMPORTANT: import the module, not the variables
 
 app = Flask(__name__)
 
@@ -137,6 +137,9 @@ def index():
 # RUN SERVER
 # ----------------------------------
 def run_server():
+    import logging
+    logging.getLogger('werkzeug').disabled = True
+
     app.run(
         host="0.0.0.0",
         port=5000,

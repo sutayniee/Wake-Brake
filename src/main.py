@@ -10,8 +10,15 @@ from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, 
 from Sample_Alarm.play_sound_alarm import play_alert
 from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
 from Algorithms.Blink_Rate.Blink_Rate_main import BlinkRateDetector
-import shared_state
-from server import run_server
+from Algorithms.Logs.main import setup_logger
+import Algorithms.Server.shared_state as shared_state
+from Algorithms.Server.server import run_server
+from collections import deque
+
+
+
+# Initialize System Logger for Post-Trip Review
+logger = setup_logger()
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -52,24 +59,31 @@ prev_time = 0
 fps = 0.0
 fps_smoothing = 0.9  # higher = smoother FPS
 
-# EAR Configuration Parameters
-EAR_THRESHOLD = 0.27 # Below this, eyes are considered closed
-CONSECUTIVE_FRAMES_THRESHOLD = 20 # Number of frames before drowsiness is detected
-frame_counter = 0 # Counter for consecutive closed-eye frames
-drowsy = False
+# Adaptive Sensitivity (ECR) - Calibration Variables
+CALIBRATION_FRAMES = 100
+calibration_counter = 0
+baseline_ears = []
+is_calibrated = False
+
+# EAR & PERCLOS Configuration Parameters
+EAR_THRESHOLD = 0.25 # Will be overwritten by calibration
+PERCLOS_WINDOW = 30.0 # 30-second window
+PERCLOS_THRESHOLD = 0.20 # 20% eye closure threshold
+
+frame_counter = 0 # Counter for consecutive closed-eye frames (micro-sleep detection)
+closure_history = deque() # Stores tuples of (timestamp, is_closed)
+shared_state.fatigue_level = "SAFE"
 
 # Blink rate Configuration Parameters
 blink_detector = BlinkRateDetector(
     threshold=EAR_THRESHOLD,
     min_frames_closed=2,   # IMPORTANT for 15 FPS
-    window_seconds=30      # shorter window = more responsive
+    window_seconds=22      # shorter window = more responsive
 )
 
 # Start Server
 threading.Thread(target=run_server, daemon=True).start()
 
-last_debug_print = 0
-DEBUG_INTERVAL = 3
 # Start Video Capture
 while True:
     ret, img = video_capture.read()
@@ -82,6 +96,18 @@ while True:
     current_time = time.time()
     dt = current_time - prev_time
     prev_time = current_time
+
+    # FPS display (upper-right)
+    h, w = img.shape[:2]
+    cv2.putText(
+        img,
+        f"FPS: {fps:.1f}",
+        (w - 150, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 255),
+        2,
+    )
 
     if dt > 0:
         current_fps = 1.0 / dt
@@ -127,62 +153,128 @@ while True:
                 right_ear = eye_aspect_ratio(right_eye)
                 left_ear = eye_aspect_ratio(left_eye_)
                 ear = (left_ear + right_ear) / 2.0
+
+                # Adaptive Sensitivity (ECR) Calibration Phase
+                if not is_calibrated:
+                    baseline_ears.append(ear)
+                    calibration_counter += 1
+                    put_text(img, f"CALIBRATING ECR: {calibration_counter}/{CALIBRATION_FRAMES}", (50, 100), color=(0, 255, 255))
+                    
+                    if calibration_counter >= CALIBRATION_FRAMES:
+                        baseline_ear = sum(baseline_ears) / len(baseline_ears)
+                        # Adaptive threshold: 75% of the user's normal baseline EAR
+                        EAR_THRESHOLD = baseline_ear * 0.75
+                        is_calibrated = True
+                        print(f"Calibration Complete! Baseline EAR: {baseline_ear:.2f}, Set Threshold: {EAR_THRESHOLD:.2f}")
+                        logger.info(f"CALIBRATION_COMPLETE,100%,0.0,{baseline_ear:.2f},0.0,{fps:.1f}")
+                    continue  # Skip detection logic until calibrated
+
+                # Postural Deviation Check
+                is_looking_down, pitch_ratio = detector.check_postural_deviation(landmarks)
+                if is_looking_down:
+                    put_text(img, "HEAD NOD DETECTED", (10, 150), color=(0, 0, 255))
+
                 #Sending EAR to Flask
                 shared_state.ear_value = round(ear, 2)
-
-                # Print Blink Rate
-                blink_rate = blink_detector.update(ear)
+                
                 #Sharing blink rate to flask
+                blink_rate = blink_detector.update(ear)
                 shared_state.bpm_value = round(blink_rate, 1)
-                if time.time() - last_debug_print > DEBUG_INTERVAL:
-
-                     print(
-                        "STATE:",
-                        shared_state.ear_value,
-                        shared_state.eye_height_value,
-                        shared_state.fps_value,
-                        shared_state.bpm_value
-                                                 )
-                     last_debug_print = time.time()
-
+                
+                # Print Blink Rate
                 put_text(img, f"BPM: {blink_rate:.1f}", (10, 90), color=(255, 255, 0))
-
                 # Print EAR
                 put_text(img, f"EAR: {ear:.2f}", (10, 60), color=(0, 255, 0))
+                # Print EAR & Threshold
+                put_text(img, f"EAR: {ear:.2f} (Thresh: {EAR_THRESHOLD:.2f})", (10, 60), color=(0, 255, 0))
 
-                # Drowsiness check
-                ctime = time.time()
-                if ear < EAR_THRESHOLD:
-                    frame_counter += 1
-
-                    if frame_counter >= CONSECUTIVE_FRAMES_THRESHOLD:
-
-                        fatigue_score = 2
-
-                        if blink_rate < 10:
-                            fatigue_score += 1
-
-                        if fatigue_score >= 2:
-                            # STATE CHANGE: Awake -> Drowsy
-                            if not drowsy:
-                                drowsy = True
-                                print("Drowsiness Detected!", time.ctime())
-                                send_to_arduino('1')  # Trigger Arduino once
-                                shared_state.fatigue_level = "HIGH"
-                        
-                        # CONTINUOUS ACTION (runs every frame while drowsy)
-                        put_text(img, "Fatigue Detected!", (200, 100))
-                        play_alert()  # Keeps playing every frame
-
+                # ========================================================
+                # PERCLOS and Drowsiness check
+                current_time = time.time()
+                is_closed = ear < EAR_THRESHOLD
+                
+                # Update closure history for PERCLOS
+                closure_history.append((current_time, is_closed))
+                
+                # Remove old frames outside the 30-second window
+                while closure_history and current_time - closure_history[0][0] > PERCLOS_WINDOW:
+                    closure_history.popleft()
+                
+                # Calculate PERCLOS (Percentage of Eye Closure)
+                if len(closure_history) > 0:
+                    closed_frames = sum(1 for _, closed in closure_history if closed)
+                    perclos = closed_frames / len(closure_history)
                 else:
-                    # STATE CHANGE: Drowsy -> Awake
-                    if drowsy:
-                        print("Driver is now Awake", time.ctime())
-                        send_to_arduino('0')  # Turn off alert once
-                        shared_state.fatigue_level = "LOW"
-                    drowsy = False
+                    perclos = 0.0
+                    
+                # Fast Recovery Mechanism: Track how long eyes have been consistently open
+                if not is_closed and not is_looking_down:
+                    shared_state.frames_open = getattr(shared_state, 'frames_open', 0) + 1
+                    if shared_state.frames_open > 60: # If awake for ~2 seconds straight
+                        # mathematically safe reset: convert all history to "eyes open"
+                        # This preserves the queue length so a single blink won't spike the math to 100%
+                        for i in range(len(closure_history)):
+                            closure_history[i] = (closure_history[i][0], False)
+                        perclos = 0.0 # Force update for this frame
+                else:
+                    shared_state.frames_open = 0
+
+                # Print perclos in camera
+                put_text(img, f"PERCLOS: {perclos:.1%}", (10, 120), color=(0, 165, 255))
+
+                # Alert Escalation Finite-State Machine & Confidence Scoring
+                # Confidence score is based directly on the PERCLOS percentage, head pitch and blink rate
+                confidence_score = min(
+                    100,
+                    int(
+                        (perclos * 100)
+                        + (20 if is_looking_down else 0)
+                        + (10 if blink_rate < 10 else 0)
+                        + (5 if blink_rate > 30 else 0)
+                    )
+                )
+                
+                if perclos >= 0.80:
+                    # SEVERE CRITICAL: 80% Fatigue - Triggers locked Scent cycle
+                    play_alert()
+                    if shared_state.fatigue_level != "CRITICAL_SCENT":
+                        print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
+                        shared_state.fatigue_level = "CRITICAL_SCENT"
+                        logger.info(f"SEVERE_FATIGUE_SCENT,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        send_to_arduino('S') 
+                    put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
+
+                elif perclos >= 0.70 or (is_looking_down and perclos >= 0.50):
+                    # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
+                    if shared_state.fatigue_level != "CRITICAL_BUZZER":
+                        print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
+                        shared_state.fatigue_level = "CRITICAL_BUZZER"
+                        logger.info(f"CRITICAL_FATIGUE_BUZZER,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        play_alert()
+                        send_to_arduino('B') 
+                    put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
+
+                elif is_closed:
+                    frame_counter += 1
+                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
+                    if frame_counter >= 20: 
+                        play_alert()
+                        if shared_state.fatigue_level != "WARNING_HAPTIC":
+                            print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
+                            shared_state.fatigue_level = "WARNING_HAPTIC"
+                            logger.info(f"MICRO_SLEEP_WARNING_HAPTIC,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                            send_to_arduino('H') 
+                        put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+                
+                else:
+                    # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
                     frame_counter = 0
-                      
+                    if shared_state.fatigue_level != "SAFE":
+                        print("Driver Alerted and Safe.", time.ctime())
+                        shared_state.fatigue_level = "SAFE"
+                        send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
+                        logger.info(f"SAFE_STATE,100%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+
                 # Print Eye Height
                 cv2.putText(
                     img,
@@ -193,18 +285,6 @@ while True:
                     (255, 0, 0),
                     2,
                 )
-
-    # FPS display (upper-right)
-    h, w = img.shape[:2]
-    cv2.putText(
-        img,
-        f"FPS: {fps:.1f}",
-        (w - 150, 30),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (0, 255, 255),
-        2,
-    )
 
     # video in mobile
     with shared_state.lock:
