@@ -48,42 +48,84 @@ void loop() {
 }
 
 void handleSerialInput() {
-  if (Serial.available() > 0) {
-    char cmd = Serial.read();
-    Serial.print("Received: "); Serial.println(cmd); // Debugging
 
-    if (cmd == 'S') { // SEVERE - Scent trigger
+  if (Serial.available()) {
+
+    String command = Serial.readStringUntil('\n');
+
+    command.trim();
+
+    Serial.print("Received: ");
+    Serial.println(command);
+
+    // =========================
+    // CONFIG COMMANDS
+    // =========================
+
+    if (command.startsWith("CFG")) {
+
+      useBuzzer = command.indexOf("SOUND:1") != -1;
+      useVibration = command.indexOf("VIB:1") != -1;
+      useScent = command.indexOf("SCENT:1") != -1;
+
+      Serial.println("=== CONFIG UPDATED ===");
+
+      Serial.print("Sound: ");
+      Serial.println(useBuzzer);
+
+      Serial.print("Vibration: ");
+      Serial.println(useVibration);
+
+      Serial.print("Scent: ");
+      Serial.println(useScent);
+    }
+
+    // =========================
+    // ALERT SIGNALS
+    // =========================
+
+    else if (command == "S") {
+
       fatigueActive = true;
-      useBuzzer = true; useVibration = true;
-      // Trigger the locked cycle if it's currently idle
-      if (currentScentState == IDLE) {
-          Serial.println("SCENT: Triggering Active Spray (30s)");
-          currentScentState = SPRAYING;
-          scentStartTime = millis();
-          digitalWrite(diffuserPin, HIGH);
+
+      if (useScent && currentScentState == IDLE) {
+
+        Serial.println("SCENT: Triggering Active Spray (30s)");
+
+        currentScentState = SPRAYING;
+
+        scentStartTime = millis();
+
+        digitalWrite(diffuserPin, HIGH);
       }
-    } 
-    else if (cmd == 'B') { // CRITICAL - Buzzer and Vibration
-      fatigueActive = true;
-      useBuzzer = true; useVibration = true;
     }
-    else if (cmd == 'H') { // WARNING - Haptic Only
+
+    else if (command == "B") {
+
       fatigueActive = true;
-      useBuzzer = false; useVibration = true;
     }
-    else if (cmd == 'N' || cmd == '0') { // SAFE
+
+    else if (command == "H") {
+
+      fatigueActive = true;
+    }
+
+    else if (command == "N" || command == "0") {
+
       fatigueActive = false;
-      // stopAllAlerts() will be called in loop, but scent will continue!
     }
   }
 }
 
 void executeAlerts() {
-  // 1. Immediate Alerts (Auditory and Haptic)
-  if (useBuzzer)
+
+  if (useBuzzer) {
     digitalWrite(buzzerPin, HIGH);
-  if (useVibration)
+  }
+
+  if (useVibration) {
     digitalWrite(vibrationPin, HIGH);
+  }
 }
 
 void handleScentCycle() {
