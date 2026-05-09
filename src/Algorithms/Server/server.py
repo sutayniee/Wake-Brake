@@ -2,7 +2,7 @@ import time
 import cv2
 from flask import Flask, jsonify, Response
 import Algorithms.Server.shared_state as shared_state   # IMPORTANT: import the module, not the variables
-from Algorithms.Arduino.Arduino5_Signal import send_to_arduino  
+from Algorithms.Arduino.Arduino_Signal import send_to_arduino  
 import socket
 import Algorithms.Server.shared_state as shared_state
 
