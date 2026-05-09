@@ -64,21 +64,26 @@ void handleSerialInput() {
 
     if (command.startsWith("CFG")) {
 
-      useBuzzer = command.indexOf("SOUND:1") != -1;
-      useVibration = command.indexOf("VIB:1") != -1;
-      useScent = command.indexOf("SCENT:1") != -1;
+  useBuzzer = command.indexOf("SOUND:1") != -1;
+  useVibration = command.indexOf("VIB:1") != -1;
+  useScent = command.indexOf("SCENT:1") != -1;
 
-      Serial.println("=== CONFIG UPDATED ===");
+  Serial.println("=== CONFIG UPDATED ===");
 
-      Serial.print("Sound: ");
-      Serial.println(useBuzzer);
+  Serial.print("Sound: ");
+  Serial.println(useBuzzer);
 
-      Serial.print("Vibration: ");
-      Serial.println(useVibration);
+  Serial.print("Vibration: ");
+  Serial.println(useVibration);
 
-      Serial.print("Scent: ");
-      Serial.println(useScent);
-    }
+  Serial.print("Scent: ");
+  Serial.println(useScent);
+
+  // 🔥 FORCE APPLY IMMEDIATELY (CRITICAL FIX)
+  if (!useBuzzer) digitalWrite(buzzerPin, LOW);
+  if (!useVibration) digitalWrite(vibrationPin, LOW);
+  if (!useScent) digitalWrite(diffuserPin, LOW);
+}
 
     // =========================
     // ALERT SIGNALS
@@ -119,13 +124,15 @@ void handleSerialInput() {
 
 void executeAlerts() {
 
-  if (useBuzzer) {
+  if (useBuzzer)
     digitalWrite(buzzerPin, HIGH);
-  }
+  else
+    digitalWrite(buzzerPin, LOW);
 
-  if (useVibration) {
+  if (useVibration)
     digitalWrite(vibrationPin, HIGH);
-  }
+  else
+    digitalWrite(vibrationPin, LOW);
 }
 
 void handleScentCycle() {
@@ -160,7 +167,12 @@ void handleScentCycle() {
 }
 
 void stopAllAlerts() {
+
   digitalWrite(buzzerPin, LOW);
   digitalWrite(vibrationPin, LOW);
-  // diffuserPin is NOT turned off here! It is managed exclusively by handleScentCycle()
+
+  // ONLY turn off diffuser if not manually disabled
+  if (!useScent) {
+    digitalWrite(diffuserPin, LOW);
+  }
 }
