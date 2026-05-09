@@ -4,10 +4,7 @@ from flask import Flask, jsonify, Response
 import Algorithms.Server.shared_state as shared_state  # IMPORTANT: import the module, not the variables
 import socket
 import Algorithms.Server.shared_state as shared_state
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+
 
 app = Flask(__name__)
 
