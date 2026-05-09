@@ -86,6 +86,7 @@ threading.Thread(target=run_server, daemon=True).start()
 
 # Start Video Capture
 while True:
+    head_state = 3  # DEFAULT: UNKNOWN each frame
     ret, img = video_capture.read()
     if not ret:
         break
@@ -171,8 +172,33 @@ while True:
 
                 # Postural Deviation Check
                 is_looking_down, pitch_ratio = detector.check_postural_deviation(landmarks)
-                if is_looking_down:
-                    put_text(img, "HEAD NOD DETECTED", (10, 150), color=(0, 0, 255))
+                 # HEAD POSTURE CLASSIFICATION
+                head_state = 3  # default: IGNORE / UNKNOWN
+
+                # HEAD STATE CLASSIFICATION (ONLY ONCE)
+                if pitch_ratio is None:
+                    head_state = 3   # UNKNOWN
+                elif 2.4 < pitch_ratio <= 2.7:
+                    head_state = 2   # NORMAL
+                elif pitch_ratio <= 2.4:
+                    head_state = 1   # HEAD DOWN
+                else:
+                    head_state = 3
+                    
+
+
+                # HEAD STATE DISPLAY (REAL OUTPUT)
+                # ALWAYS SHOW HEAD STATE (INSIDE LOOP, NOT OUTSIDE)
+
+                if head_state == 1:
+                    put_text(img, "HEAD DOWN DETECTED", (10, 150), color=(0, 0, 255))
+
+                elif head_state == 2:
+                    put_text(img, "NORMAL HEAD POSITION", (10, 150), color=(0, 255, 0))
+
+           
+
+            
 
                 #Sending EAR to Flask
                 shared_state.ear_value = round(ear, 2)
@@ -206,9 +232,11 @@ while True:
                     perclos = closed_frames / len(closure_history)
                 else:
                     perclos = 0.0
+                    # Send PERCLOS to mobile app
+                    shared_state.perclos_value = round(perclos * 100, 1)
                     
                 # Fast Recovery Mechanism: Track how long eyes have been consistently open
-                if not is_closed and not is_looking_down:
+                if not is_closed and head_state != 1:
                     shared_state.frames_open = getattr(shared_state, 'frames_open', 0) + 1
                     if shared_state.frames_open > 60: # If awake for ~2 seconds straight
                         # mathematically safe reset: convert all history to "eyes open"
@@ -228,7 +256,7 @@ while True:
                     100,
                     int(
                         (perclos * 100)
-                        + (20 if is_looking_down else 0)
+                        + (20 if head_state == 1 else 0)
                         + (10 if blink_rate < 10 else 0)
                         + (5 if blink_rate > 30 else 0)
                     )
@@ -241,17 +269,17 @@ while True:
                         print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "SEVERE_SCENT"
                         logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('S') 
+                        #send_to_arduino('S') 
                     put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
 
-                elif perclos >= 0.70 or (is_looking_down and perclos >= 0.50):
+                elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
                     # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
                     play_alert()
                     if shared_state.fatigue_level != "CRITICAL_BUZZER":
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
                         logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('B') 
+                        #send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
                 elif is_closed:
@@ -263,7 +291,7 @@ while True:
                             print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
                             shared_state.fatigue_level = "WARNING_HAPTIC"
                             logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            send_to_arduino('H') 
+                            #send_to_arduino('H') 
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                 
                 else:
@@ -272,7 +300,7 @@ while True:
                     if shared_state.fatigue_level != "SAFE":
                         print("Driver Alerted and Safe.", time.ctime())
                         shared_state.fatigue_level = "SAFE"
-                        send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
+                        #send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
                         logger.info(f"SAFE_STATE,100%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
 
                 # Print Eye Height
