@@ -112,14 +112,17 @@ def update_config():
 
 @app.route('/panic-reset', methods=['POST'])
 def panic_reset():
+    import time
     command = "X\n"
     print("Sending panic reset:", command)
-    send_to_arduino(command)
     
-    # Also reset the shared state
+    # Update shared state FIRST to prevent race condition with main detection loop
     with shared_state.lock:
         shared_state.fatigue_level = "SAFE"
-        shared_state.clear_history_flag = True
+        shared_state.panic_cooldown_until = time.time() + 5.0
+        
+    # Send 'X' command to Arduino AFTER the shared state is secured
+    send_to_arduino(command)
         
     return jsonify({
         "status": "success",

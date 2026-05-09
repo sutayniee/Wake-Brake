@@ -213,9 +213,11 @@ while True:
                 # ========================================================
                 # Check for manual overrides from the App
                 with shared_state.lock:
-                    if getattr(shared_state, 'clear_history_flag', False):
+                    in_panic_cooldown = time.time() < getattr(shared_state, 'panic_cooldown_until', 0.0)
+                    if in_panic_cooldown:
                         closure_history.clear() # Instantly drops PERCLOS to 0%
-                        shared_state.clear_history_flag = False
+                        frame_counter = 0
+                        shared_state.fatigue_level = "SAFE"
 
                 # PERCLOS and Drowsiness check
                 current_time = time.time()
@@ -229,12 +231,14 @@ while True:
                     closure_history.popleft()
                 
                 # Calculate PERCLOS (Percentage of Eye Closure)
-                if len(closure_history) > 0:
+                if len(closure_history) >= 30: # Minimum sample size check (~2 seconds)
                     closed_frames = sum(1 for _, closed in closure_history if closed)
                     perclos = closed_frames / len(closure_history)
                 else:
                     perclos = 0.0
-                    # Send PERCLOS to mobile app
+                    
+                # Send PERCLOS to mobile app
+                with shared_state.lock:
                     shared_state.perclos_value = round(perclos * 100, 1)
                     
                 # Fast Recovery Mechanism: Track how long eyes have been consistently open

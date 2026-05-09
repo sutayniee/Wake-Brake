@@ -18,5 +18,5 @@ head_pose_status = "CENTER"
 fatigue_log = ""
 perclos_value = 0.0
 
-# Used to reset PERCLOS history during a manual panic override
-clear_history_flag = False
+# Used to prevent immediate re-triggering during a manual panic override
+panic_cooldown_until = 0.0
