@@ -1,7 +1,8 @@
 import time
 import cv2
 from flask import Flask, jsonify, Response
-import Algorithms.Server.shared_state as shared_state  # IMPORTANT: import the module, not the variables
+import Algorithms.Server.shared_state as shared_state   # IMPORTANT: import the module, not the variables
+from Algorithms.Arduino.Arduino5_Signal import send_to_arduino  
 import socket
 import Algorithms.Server.shared_state as shared_state
 
@@ -39,13 +40,14 @@ def generate_frames():
 @app.route("/fatigue")
 def fatigue():
     return jsonify({
-        "bpm": shared_state.bpm_value,
-        "ear": shared_state.ear_value,
-        "eye_height": shared_state.eye_height_value,
-        "fps": shared_state.fps_value,
-        "level": shared_state.fatigue_level,
-        "head_pose": shared_state.head_pose_status
-    })
+    "bpm": shared_state.bpm_value,
+    "ear": shared_state.ear_value,
+    "eye_height": shared_state.eye_height_value,
+    "fps": shared_state.fps_value,
+    "level": shared_state.fatigue_level,
+    "head_pose": getattr(shared_state, "head_pose_status", "CENTER"),
+    "fatigue_log": getattr(shared_state, "fatigue_log", "")
+})
 # ----------------------------------
 # VIDEO ROUTE
 # ----------------------------------
