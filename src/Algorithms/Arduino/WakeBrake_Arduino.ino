@@ -41,13 +41,10 @@ void loop() {
   // FAILSAFE: If no serial communication for 3 seconds, kill alarms
   if (fatigueActive && (millis() - lastCommandTime > 3000)) {
     fatigueActive = false;
-    Serial.println("FAILSAFE: Connection to Python lost. Alarms disabled.");
-  }
-
-  if (fatigueActive) {
-    executeAlerts();
-  } else {
+    currentScentState = IDLE;
+    digitalWrite(diffuserPin, LOW);
     stopAllAlerts();
+    Serial.println("FAILSAFE: Connection to Python lost. Alarms disabled.");
   }
 
   // Scent cycle runs independently of fatigueActive to enforce the Locked Cycle
@@ -99,57 +96,54 @@ void handleSerialInput() {
     // =========================
 
     else if (command == "S") {
-
       fatigueActive = true;
-
+      digitalWrite(buzzerPin, LOW);
+      digitalWrite(vibrationPin, LOW);
+      
       if (useScent && currentScentState == IDLE) {
-
         Serial.println("SCENT: Triggering Active Spray (30s)");
-
         currentScentState = SPRAYING;
-
         scentStartTime = millis();
-
         digitalWrite(diffuserPin, HIGH);
       }
     }
 
     else if (command == "B") {
-
       fatigueActive = true;
+      if (useBuzzer) digitalWrite(buzzerPin, HIGH); else digitalWrite(buzzerPin, LOW);
+      digitalWrite(vibrationPin, LOW);
+      
+      currentScentState = IDLE;
+      digitalWrite(diffuserPin, LOW);
+      Serial.println("BUZZER ACTIVE: Forced Scent/Vibration LOW");
     }
 
     else if (command == "H") {
-
       fatigueActive = true;
+      digitalWrite(buzzerPin, LOW);
+      if (useVibration) digitalWrite(vibrationPin, HIGH); else digitalWrite(vibrationPin, LOW);
+      
+      currentScentState = IDLE;
+      digitalWrite(diffuserPin, LOW);
+      Serial.println("VIBRATION ACTIVE: Forced Scent/Buzzer LOW");
     }
 
     else if (command == "N" || command == "0") {
-
       fatigueActive = false;
+      stopAllAlerts();
+      currentScentState = IDLE;
+      digitalWrite(diffuserPin, LOW);
+      Serial.println("SAFE: All alerts stopped.");
     }
 
     else if (command == "X" || command == "KILL") {
-
       fatigueActive = false;
       currentScentState = IDLE;
       digitalWrite(diffuserPin, LOW);
+      stopAllAlerts();
       Serial.println("SYSTEM OVERRIDDEN: All alerts stopped.");
     }
   }
-}
-
-void executeAlerts() {
-
-  if (useBuzzer)
-    digitalWrite(buzzerPin, HIGH);
-  else
-    digitalWrite(buzzerPin, LOW);
-
-  if (useVibration)
-    digitalWrite(vibrationPin, HIGH);
-  else
-    digitalWrite(vibrationPin, LOW);
 }
 
 void handleScentCycle() {

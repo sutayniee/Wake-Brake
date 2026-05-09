@@ -19,8 +19,15 @@ def check_arduino_connection():
         for p in ports:
             print(p.device)
             
+import Algorithms.Server.dashboard as db_ui
+
 def send_to_arduino(signal):
     global arduino, arduino_connected
+    
+    # Update the Virtual Dashboard
+    if signal:
+        db_ui.dashboard.update_state(signal)
+        
     if arduino_connected and arduino is not None:
         try:
             if arduino.is_open:

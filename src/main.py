@@ -256,58 +256,75 @@ while True:
                 # Print perclos in camera
                 put_text(img, f"PERCLOS: {perclos:.1%}", (10, 120), color=(0, 165, 255))
 
-                # Alert Escalation Finite-State Machine & Confidence Scoring
-                # Confidence score is based directly on the PERCLOS percentage, head pitch and blink rate
-                confidence_score = min(
-                    100,
-                    int(
-                        (perclos * 100)
-                        + (20 if head_state == 1 else 0)
-                        + (10 if blink_rate < 10 else 0)
-                        + (5 if blink_rate > 30 else 0)
-                    )
-                )
-                
-                if perclos >= 0.80:
-                    # SEVERE CRITICAL: 80% Fatigue - Triggers locked Scent cycle
-                    # play_alert()
-                    if shared_state.fatigue_level != "SEVERE_SCENT":
-                        print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
-                        shared_state.fatigue_level = "SEVERE_SCENT"
-                        logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('S') 
-                    put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
-
-                elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
-                    # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
-                    # play_alert()
-                    if shared_state.fatigue_level != "CRITICAL_BUZZER":
-                        print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
-                        shared_state.fatigue_level = "CRITICAL_BUZZER"
-                        logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('B') 
-                    put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
-
-                elif is_closed:
-                    frame_counter += 1
-                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
-                    if frame_counter >= 20: 
-                        # play_alert()
-                        if shared_state.fatigue_level != "WARNING_HAPTIC":
-                            print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
-                            shared_state.fatigue_level = "WARNING_HAPTIC"
-                            logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            send_to_arduino('H') 
-                        put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
-                
+                if in_panic_cooldown:
+                    # STRICTLY PROHIBIT SENDING ANY SIGNALS DURING COOLDOWN
+                    put_text(img, "COOLDOWN ACTIVE - ALARMS MUTED", (150, 100), color=(0, 255, 255))
                 else:
-                    # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
-                    frame_counter = 0
-                    if shared_state.fatigue_level != "SAFE":
-                        print("Driver Alerted and Safe.", time.ctime())
-                        shared_state.fatigue_level = "SAFE"
-                        send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
-                        logger.info(f"SAFE_STATE,100%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                    # Alert Escalation Finite-State Machine & Confidence Scoring
+                    # Confidence score is based directly on the PERCLOS percentage, head pitch and blink rate
+                    confidence_score = min(
+                        100,
+                        int(
+                            (perclos * 100)
+                            + (20 if head_state == 1 else 0)
+                            + (10 if blink_rate < 10 else 0)
+                            + (5 if blink_rate > 30 else 0)
+                        )
+                    )
+                    
+                    if perclos >= 0.80:
+                        # SEVERE CRITICAL: 80% Fatigue - Triggers locked Scent cycle
+                        # play_alert()
+                        if shared_state.fatigue_level != "SEVERE_SCENT":
+                            print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
+                            shared_state.fatigue_level = "SEVERE_SCENT"
+                            logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                            send_to_arduino('S') 
+                        put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
+
+                    elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
+                        # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
+                        # play_alert()
+                        if shared_state.fatigue_level != "CRITICAL_BUZZER":
+                            print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
+                            shared_state.fatigue_level = "CRITICAL_BUZZER"
+                            logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                            send_to_arduino('B') 
+                        put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
+
+                    elif is_closed:
+                        frame_counter += 1
+                        # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
+                        if frame_counter >= 20: 
+                            # play_alert()
+                            if shared_state.fatigue_level != "WARNING_HAPTIC":
+                                print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
+                                shared_state.fatigue_level = "WARNING_HAPTIC"
+                                logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                                send_to_arduino('H') 
+                            put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+                    
+                    else:
+                        # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
+                        frame_counter = 0
+                        if shared_state.fatigue_level != "SAFE":
+                            print("Driver Alerted and Safe.", time.ctime())
+                            shared_state.fatigue_level = "SAFE"
+                            send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
+                            logger.info(f"SAFE_STATE,100%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+
+                    # Arduino Heartbeat Failsafe (Send current state every 1 second)
+                    if current_time - last_heartbeat_time > 1.0:
+                        last_heartbeat_time = current_time
+                        current_state = shared_state.fatigue_level
+                        if current_state == "SEVERE_SCENT":
+                            send_to_arduino('S')
+                        elif current_state == "CRITICAL_BUZZER":
+                            send_to_arduino('B')
+                        elif current_state == "WARNING_HAPTIC":
+                            send_to_arduino('H')
+                        else:
+                            send_to_arduino('N')
 
                 # Print Eye Height
                 cv2.putText(
@@ -319,19 +336,6 @@ while True:
                     (255, 0, 0),
                     2,
                 )
-
-                # Arduino Heartbeat Failsafe (Send current state every 1 second)
-                if current_time - last_heartbeat_time > 1.0:
-                    last_heartbeat_time = current_time
-                    current_state = shared_state.fatigue_level
-                    if current_state == "SEVERE_SCENT":
-                        send_to_arduino('S')
-                    elif current_state == "CRITICAL_BUZZER":
-                        send_to_arduino('B')
-                    elif current_state == "WARNING_HAPTIC":
-                        send_to_arduino('H')
-                    else:
-                        send_to_arduino('N')
 
     # video in mobile
     with shared_state.lock:
