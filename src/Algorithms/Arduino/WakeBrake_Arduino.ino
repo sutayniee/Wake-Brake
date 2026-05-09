@@ -19,6 +19,7 @@ enum ScentState {
 bool fatigueActive = false;
 ScentState currentScentState = IDLE;
 unsigned long scentStartTime = 0;
+unsigned long lastCommandTime = 0;
 
 // Feature Toggles (Can be updated via Serial from your Mobile App)
 bool useBuzzer = true;
@@ -37,6 +38,12 @@ void setup() {
 void loop() {
   handleSerialInput();
 
+  // FAILSAFE: If no serial communication for 3 seconds, kill alarms
+  if (fatigueActive && (millis() - lastCommandTime > 3000)) {
+    fatigueActive = false;
+    Serial.println("FAILSAFE: Connection to Python lost. Alarms disabled.");
+  }
+
   if (fatigueActive) {
     executeAlerts();
   } else {
@@ -54,6 +61,8 @@ void handleSerialInput() {
     String command = Serial.readStringUntil('\n');
 
     command.trim();
+    
+    lastCommandTime = millis(); // Reset the watchdog timer on ANY command
 
     Serial.print("Received: ");
     Serial.println(command);
@@ -119,6 +128,14 @@ void handleSerialInput() {
 
       fatigueActive = false;
     }
+
+    else if (command == "X" || command == "KILL") {
+
+      fatigueActive = false;
+      currentScentState = IDLE;
+      digitalWrite(diffuserPin, LOW);
+      Serial.println("SYSTEM OVERRIDDEN: All alerts stopped.");
+    }
   }
 }
 
@@ -170,9 +187,4 @@ void stopAllAlerts() {
 
   digitalWrite(buzzerPin, LOW);
   digitalWrite(vibrationPin, LOW);
-
-  // ONLY turn off diffuser if not manually disabled
-  if (!useScent) {
-    digitalWrite(diffuserPin, LOW);
-  }
 }

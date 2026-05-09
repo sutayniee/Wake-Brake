@@ -84,6 +84,8 @@ blink_detector = BlinkRateDetector(
 # Start Server
 threading.Thread(target=run_server, daemon=True).start()
 
+last_heartbeat_time = 0
+
 # Start Video Capture
 while True:
     head_state = 3  # DEFAULT: UNKNOWN each frame
@@ -209,6 +211,12 @@ while True:
                 put_text(img, f"EAR: {ear:.2f} (Thresh: {EAR_THRESHOLD:.2f})", (10, 60), color=(0, 255, 0))
 
                 # ========================================================
+                # Check for manual overrides from the App
+                with shared_state.lock:
+                    if getattr(shared_state, 'clear_history_flag', False):
+                        closure_history.clear() # Instantly drops PERCLOS to 0%
+                        shared_state.clear_history_flag = False
+
                 # PERCLOS and Drowsiness check
                 current_time = time.time()
                 is_closed = ear < EAR_THRESHOLD
@@ -307,6 +315,19 @@ while True:
                     (255, 0, 0),
                     2,
                 )
+
+                # Arduino Heartbeat Failsafe (Send current state every 1 second)
+                if current_time - last_heartbeat_time > 1.0:
+                    last_heartbeat_time = current_time
+                    current_state = shared_state.fatigue_level
+                    if current_state == "SEVERE_SCENT":
+                        send_to_arduino('S')
+                    elif current_state == "CRITICAL_BUZZER":
+                        send_to_arduino('B')
+                    elif current_state == "WARNING_HAPTIC":
+                        send_to_arduino('H')
+                    else:
+                        send_to_arduino('N')
 
     # video in mobile
     with shared_state.lock:

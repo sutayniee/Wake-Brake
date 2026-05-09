@@ -17,3 +17,6 @@ frames_open = 0
 head_pose_status = "CENTER"
 fatigue_log = ""
 perclos_value = 0.0
+
+# Used to reset PERCLOS history during a manual panic override
+clear_history_flag = False

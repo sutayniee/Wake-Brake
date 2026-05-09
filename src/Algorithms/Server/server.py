@@ -110,6 +110,22 @@ def update_config():
         "command": command
     })
 
+@app.route('/panic-reset', methods=['POST'])
+def panic_reset():
+    command = "X\n"
+    print("Sending panic reset:", command)
+    send_to_arduino(command)
+    
+    # Also reset the shared state
+    with shared_state.lock:
+        shared_state.fatigue_level = "SAFE"
+        shared_state.clear_history_flag = True
+        
+    return jsonify({
+        "status": "success",
+        "command": command
+    })
+
 
 # ----------------------------------
 # WEB PAGE
