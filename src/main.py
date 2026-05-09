@@ -264,7 +264,7 @@ while True:
                 
                 if perclos >= 0.80:
                     # SEVERE CRITICAL: 80% Fatigue - Triggers locked Scent cycle
-                    play_alert()
+                    # play_alert()
                     if shared_state.fatigue_level != "SEVERE_SCENT":
                         print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "SEVERE_SCENT"
@@ -274,7 +274,7 @@ while True:
 
                 elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
                     # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
-                    play_alert()
+                    # play_alert()
                     if shared_state.fatigue_level != "CRITICAL_BUZZER":
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
@@ -286,7 +286,7 @@ while True:
                     frame_counter += 1
                     # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
                     if frame_counter >= 20: 
-                        play_alert()
+                        # play_alert()
                         if shared_state.fatigue_level != "WARNING_HAPTIC":
                             print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
                             shared_state.fatigue_level = "WARNING_HAPTIC"
