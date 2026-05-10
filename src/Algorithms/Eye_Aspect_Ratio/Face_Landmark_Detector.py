@@ -82,11 +82,13 @@ class FaceLandmarkDetector:
             return []
 
         gray_image = np.ascontiguousarray(gray_image, dtype=np.uint8)
+        """
         print(
             f"[FaceLandmarkDetector] image type={type(image)} "
             f"dtype={image.dtype} shape={getattr(image, 'shape', None)} "
             f"gray dtype={gray_image.dtype} shape={gray_image.shape}"
         )
+        """
 
         all_faces_landmarks = []
 
