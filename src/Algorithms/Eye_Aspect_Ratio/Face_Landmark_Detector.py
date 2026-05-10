@@ -172,3 +172,20 @@ class FaceLandmarkDetector:
             float: Euclidean distance.
         """
         return np.linalg.norm(np.array(point1) - np.array(point2))
+
+    def check_postural_deviation(self, landmarks):
+        """ 
+        Estimates head pitch (looking down) using 2D geometric ratios.
+        Compares the nose-to-chin distance vs. eye-to-nose distance.
+        """
+        # 27 = top of nose bridge (between eyes), 30 = nose tip, 8 = bottom of chin
+        nose_length = landmarks[30][1] - landmarks[27][1]
+        chin_length = landmarks[8][1] - landmarks[30][1]
+        
+        if nose_length == 0:
+            return False, 1.0
+            
+        pitch_ratio = chin_length / nose_length
+        # Normally pitch_ratio is around 1.0 - 1.5. If looking down significantly, chin distance shortens relative to nose.
+        is_looking_down = pitch_ratio < 0.7 
+        return is_looking_down, pitch_ratio
