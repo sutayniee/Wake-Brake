@@ -287,7 +287,7 @@ while True:
                             print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
                             shared_state.fatigue_level = "WARNING_HAPTIC"
                             logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            if shared_state.haptic_enabled:
+                            if shared_state.vibration_enabled:
                                 send_to_arduino('H') 
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                 
