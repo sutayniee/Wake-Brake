@@ -15,6 +15,15 @@ enum ScentState {
   COOLDOWN
 };
 
+enum AlertMode {
+  ALERT_NONE,
+  ALERT_HAPTIC,
+  ALERT_BUZZER,
+  ALERT_SEVERE
+};
+
+AlertMode currentAlertMode = ALERT_NONE;
+
 // Global State Variables
 bool fatigueActive = false;
 ScentState currentScentState = IDLE;
@@ -92,6 +101,7 @@ void handleSerialInput() {
     else if (command == "S") {
 
       fatigueActive = true;
+      currentAlertMode = ALERT_SEVERE;
 
       if (useScent && currentScentState == IDLE) {
 
@@ -108,31 +118,49 @@ void handleSerialInput() {
     else if (command == "B") {
 
       fatigueActive = true;
+      currentAlertMode = ALERT_BUZZER;
     }
 
     else if (command == "H") {
 
       fatigueActive = true;
+      currentAlertMode = ALERT_HAPTIC;
     }
 
     else if (command == "N" || command == "0") {
 
       fatigueActive = false;
+      currentAlertMode = ALERT_NONE;
     }
   }
 }
 
 void executeAlerts() {
 
-  if (useBuzzer)
-    digitalWrite(buzzerPin, HIGH);
-  else
-    digitalWrite(buzzerPin, LOW);
+  switch (currentAlertMode) {
 
-  if (useVibration)
-    digitalWrite(vibrationPin, HIGH);
-  else
-    digitalWrite(vibrationPin, LOW);
+    case ALERT_HAPTIC:
+      digitalWrite(vibrationPin, useVibration ? HIGH : LOW);
+      digitalWrite(buzzerPin, LOW);
+      break;
+
+    case ALERT_BUZZER:
+      digitalWrite(vibrationPin, useVibration ? HIGH : LOW);
+      digitalWrite(buzzerPin, useBuzzer ? HIGH : LOW);
+      break;
+
+    case ALERT_SEVERE:
+      digitalWrite(vibrationPin, useVibration ? HIGH : LOW);
+      digitalWrite(buzzerPin, useBuzzer ? HIGH : LOW);
+      // scent handled separately (FSM)
+      break;
+
+    case ALERT_NONE:
+    default:
+      digitalWrite(vibrationPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      break;
+  }
 }
 
 void handleScentCycle() {
