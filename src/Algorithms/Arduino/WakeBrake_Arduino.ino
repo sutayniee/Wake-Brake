@@ -15,9 +15,16 @@ enum ScentState {
   COOLDOWN
 };
 
+enum AlertMode {
+  ALERT_NONE,
+  ALERT_HAPTIC,
+  ALERT_CRITICAL
+};
+
 // Global State Variables
 bool fatigueActive = false;
 ScentState currentScentState = IDLE;
+AlertMode currentAlertMode = ALERT_NONE;
 unsigned long scentStartTime = 0;
 
 // Feature Toggles (Can be updated via Serial from your Mobile App)
@@ -107,18 +114,21 @@ void handleSerialInput() {
 
     else if (command == "B") {
 
-      fatigueActive = true;
-    }
+  fatigueActive = true;
+  currentAlertMode = ALERT_CRITICAL;
+}
 
-    else if (command == "H") {
+else if (command == "H") {
 
-      fatigueActive = true;
-    }
+  fatigueActive = true;
+  currentAlertMode = ALERT_HAPTIC;
+}
 
-    else if (command == "N" || command == "0") {
+else if (command == "N" || command == "0") {
 
-      fatigueActive = false;
-    }
+  fatigueActive = false;
+  currentAlertMode = ALERT_NONE;
+}
   }
 }
 
