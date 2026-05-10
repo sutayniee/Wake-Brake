@@ -263,7 +263,8 @@ while True:
                         print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "SEVERE_SCENT"
                         logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('S') 
+                        if shared_state.scent_enabled:
+                            send_to_arduino('S') 
                     put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
 
                 elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
@@ -273,7 +274,8 @@ while True:
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
                         logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        send_to_arduino('B') 
+                        if shared_state.buzzer_enabled:
+                            send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
                 elif is_closed:
@@ -285,7 +287,8 @@ while True:
                             print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
                             shared_state.fatigue_level = "WARNING_HAPTIC"
                             logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            send_to_arduino('H') 
+                            if shared_state.haptic_enabled:
+                                send_to_arduino('H') 
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                 
                 else:
