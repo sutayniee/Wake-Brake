@@ -305,32 +305,9 @@ while True:
                     2,
                 )
 
-<<<<<<< HEAD
-    # FPS calculation
-    current_time = time.time()
-    dt = current_time - prev_time
-    prev_time = current_time
-
-    if dt > 0:
-        current_fps = 1.0 / dt
-        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
-
-    # FPS display (upper-right)
-    h, w = img.shape[:2]
-    cv2.putText(
-        img,
-        f"FPS: {fps:.1f}",
-        (w - 150, 30),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (0, 255, 255),
-        2,
-    )
-=======
     # video in mobile
     with shared_state.lock:
         shared_state.output_frame = img.copy()
->>>>>>> jin
 
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
