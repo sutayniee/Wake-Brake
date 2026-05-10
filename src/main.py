@@ -274,7 +274,7 @@ while True:
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
                         logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        if shared_state.buzzer_enabled:
+                        if shared_state.sound_enabled:
                             send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
