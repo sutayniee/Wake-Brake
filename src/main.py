@@ -246,6 +246,7 @@ while True:
 
                 # Alert Escalation Finite-State Machine & Confidence Scoring
                 # Confidence score is based directly on the PERCLOS percentage, head pitch and blink rate
+                active_state = shared_state.fatigue_level
                 confidence_score = min(
                     100,
                     int(
@@ -256,41 +257,48 @@ while True:
                     )
                 )
                 
-                if perclos >= 0.80:
+                if is_closed and frame_counter >= 20:
+                    frame_counter += 1
                     # SEVERE CRITICAL: 80% Fatigue - Triggers locked Scent cycle
                     # play_alert()
-                    if shared_state.fatigue_level != "SEVERE_SCENT":
-                        print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
-                        shared_state.fatigue_level = "SEVERE_SCENT"
-                        logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                        if shared_state.scent_enabled:
-                            send_to_arduino('S') 
-                    put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
-                elif is_closed:
-                    frame_counter += 1
-                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
-                    if frame_counter >= 20: 
-                        # play_alert()
-                        if shared_state.fatigue_level != "WARNING_HAPTIC":
-                            print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
-                            shared_state.fatigue_level = "WARNING_HAPTIC"
+                    if active_state != "WARNING_HAPTIC":
+                        print(f"MICRO-SLEEP WARNING Confidence: {confidence_score}%", time.ctime())
+                        shared_state.fatigue_level = "WARNING_HAPTIC"
+                        if shared_state.vibration_enabled:
+                            send_to_arduino('H')
                             logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            if shared_state.vibration_enabled:
-                                send_to_arduino('H') 
-                        put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
-                        
-                elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50): 
+                            
+                    put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+
+                elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
+                    frame_counter = 0  # reset microsleep counter 
                     # CRITICAL STATE: 70% Fatigue - Triggers Buzzer and Vibration
                     # play_alert()
-                    if shared_state.fatigue_level != "CRITICAL_BUZZER":
+                    if active_state != "CRITICAL_BUZZER":
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
-                        logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
                         if shared_state.sound_enabled:
-                            send_to_arduino('B') 
+                            send_to_arduino('B')
+                        logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}") 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
-                
+                elif perclos >= 0.80:
+                    frame_counter = 0  # reset microsleep counter
+                    frame_counter += 1
+                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
+                    if active_state != "SEVERE_SCENT":
+                        print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
+                        shared_state.fatigue_level = "SEVERE_SCENT" 
+                        # play_alert()
+                        if shared_state.scent_enabled:
+                            send_to_arduino('S')
+                        logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        shared_state.fatigue_level = "WARNING_HAPTIC"
+                        put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
+                            
+                            
+                               
+                       
                 
                 else:
                     # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
