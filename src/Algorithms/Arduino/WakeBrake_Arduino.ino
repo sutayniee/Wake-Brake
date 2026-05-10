@@ -26,6 +26,7 @@ bool fatigueActive = false;
 ScentState currentScentState = IDLE;
 AlertMode currentAlertMode = ALERT_NONE;
 unsigned long scentStartTime = 0;
+const unsigned long hapticPriorityDuration = 3000; // 3 seconds
 
 // Feature Toggles (Can be updated via Serial from your Mobile App)
 bool useBuzzer = true;
@@ -114,6 +115,14 @@ void handleSerialInput() {
 
     else if (command == "B") {
 
+  // Prevent buzzer override while haptic priority is active
+  if (currentAlertMode == ALERT_HAPTIC &&
+      millis() - hapticStartTime < hapticPriorityDuration) {
+
+    Serial.println("Buzzer blocked during HAPTIC priority window");
+    return;
+  }
+
   fatigueActive = true;
   currentAlertMode = ALERT_CRITICAL;
 }
@@ -122,6 +131,9 @@ else if (command == "H") {
 
   fatigueActive = true;
   currentAlertMode = ALERT_HAPTIC;
+
+  // Start haptic priority timer
+  hapticStartTime = millis();
 }
 
 else if (command == "N" || command == "0") {
