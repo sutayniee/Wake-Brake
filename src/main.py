@@ -1,5 +1,8 @@
+import serial
 import cv2
 import time
+import threading
+from flask import Flask, jsonify, Response
 from pathlib import Path
 from Algorithms.Haar_Cascade.Haar_Cascade_main import detect_face
 from Algorithms.Eye_Aspect_Ratio.Face_Landmark_Detector import FaceLandmarkDetector
@@ -11,8 +14,6 @@ from Algorithms.Logs.main import setup_logger
 import Algorithms.Server.shared_state as shared_state
 from Algorithms.Server.server import run_server
 from collections import deque
-
-
 
 # Initialize System Logger for Post-Trip Review
 logger = setup_logger()
@@ -26,8 +27,6 @@ _CASCADE_PREDICTOR = (
     / "Models"
     / "shape_predictor_68_face_landmarks.dat"
 )
-# Sound Alarm path IMPORTANT!! Always change path for testing right click mp3/wav file copy path then proceed to paste.
-# Path_Alarm = "Wake-Brake\src\Sample_Alarm\soundbeat.mp3"
 
 # Load face cascades
 face_cascades = [
@@ -47,6 +46,11 @@ detector = FaceLandmarkDetector(str(_CASCADE_PREDICTOR))
 
 # Video capture
 video_capture = cv2.VideoCapture(0)
+
+# Arduino communication 
+# CONNECT TO ARDUINO FOR MULTIMODAL ALERTS
+check_arduino_connection()
+# if an error occured due to wrong port, change them in Arduino.Arduino_signal def check_arduino_connection
 
 # FPS variables
 prev_time = 0
