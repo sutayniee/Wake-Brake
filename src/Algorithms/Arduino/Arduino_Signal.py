@@ -9,7 +9,7 @@ def check_arduino_connection():
     global arduino, arduino_connected
     try:
         # Replace 'COM' value with your actual port!
-        arduino = serial.Serial(port='/dev/ttyACM0', baudrate=9600, timeout=1)
+        arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)
         time.sleep(2)  # Allow Arduino to initialize
         arduino_connected = True
         print("Arduino connected successfully.")
