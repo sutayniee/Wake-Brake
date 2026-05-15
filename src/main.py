@@ -276,6 +276,22 @@ while True:
                             send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
+                elif perclos >= PERCLOS_THRESHOLD:
+                    if macro_fatigue_start is None:
+                        macro_fatigue_start = current_time  # start timer
+
+                    # Check if sustained for 30 seconds
+                    elif (current_time - macro_fatigue_start) >= PERCLOS_WINDOW:
+                        if not macro_fatigue_triggered:
+                            if shared_state.fatigue_level != "MACRO_FATIGUE":
+                                print(f"FATIGUE (MACRO DETECTED) - PERCLOS sustained ≥ {PERCLOS_THRESHOLD:.2f}", time.ctime())
+                                logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                                shared_state.fatigue_level = "MACRO_FATIGUE"
+                                if shared_state.vibration_enabled:
+                                    send_to_arduino('H')  # macro-level haptic warning
+                            put_text(img, "Warning: Macro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+                            macro_fatigue_triggered = True
+
                 elif is_closed:
                     frame_counter += 1
                     # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
@@ -292,6 +308,8 @@ while True:
                 else:
                     # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
                     frame_counter = 0
+                    macro_fatigue_start = None
+                    macro_fatigue_triggered = False
                     if shared_state.fatigue_level != "SAFE":
                         print("Driver Alerted and Safe.", time.ctime())
                         shared_state.fatigue_level = "SAFE"
