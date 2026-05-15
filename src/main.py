@@ -278,6 +278,19 @@ while True:
                             send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
+                elif is_closed:
+                    frame_counter += 1
+                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
+                    if frame_counter >= 20: 
+                        # play_alert()
+                        if shared_state.fatigue_level != "WARNING_HAPTIC":
+                            print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
+                            shared_state.fatigue_level = "WARNING_HAPTIC"
+                            logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                            if shared_state.vibration_enabled:
+                                send_to_arduino('H') 
+                        put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+                
                 elif perclos >= PERCLOS_THRESHOLD:
                     if macro_fatigue_start is None:
                         macro_fatigue_start = current_time  # start timer
@@ -294,19 +307,6 @@ while True:
                             put_text(img, "Warning: Macro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                             macro_fatigue_triggered = True
 
-                elif is_closed:
-                    frame_counter += 1
-                    # WARNING STATE: Micro-sleep detected (>3s of closed eyes. Assumes ~15-30fps, 45 frames = ~1.5 to 3 seconds)
-                    if frame_counter >= 20: 
-                        # play_alert()
-                        if shared_state.fatigue_level != "WARNING_HAPTIC":
-                            print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
-                            shared_state.fatigue_level = "WARNING_HAPTIC"
-                            logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
-                            if shared_state.vibration_enabled:
-                                send_to_arduino('H') 
-                        put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
-                
                 else:
                     # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
                     frame_counter = 0
