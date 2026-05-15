@@ -67,6 +67,8 @@ is_calibrated = False
 EAR_THRESHOLD = 0.25 # Will be overwritten by calibration
 PERCLOS_WINDOW = 30.0 # 30-second window
 PERCLOS_THRESHOLD = 0.20 # 20% eye closure threshold
+macro_fatigue_start = None
+macro_fatigue_triggered = False
 
 frame_counter = 0 # Counter for consecutive closed-eye frames (micro-sleep detection)
 closure_history = deque() # Stores tuples of (timestamp, is_closed)
