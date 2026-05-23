@@ -333,10 +333,11 @@ while True:
     with shared_state.lock:
         shared_state.output_frame = img.copy()
 
+    """"
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
-
+    """ 
 video_capture.release()
 cv2.destroyAllWindows()
