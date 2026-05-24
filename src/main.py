@@ -67,6 +67,8 @@ is_calibrated = False
 EAR_THRESHOLD = 0.25 # Will be overwritten by calibration
 PERCLOS_WINDOW = 30.0 # 30-second window
 PERCLOS_THRESHOLD = 0.20 # 20% eye closure threshold
+macro_fatigue_start = None
+macro_fatigue_triggered = False
 
 frame_counter = 0 # Counter for consecutive closed-eye frames (micro-sleep detection)
 closure_history = deque() # Stores tuples of (timestamp, is_closed)
@@ -289,9 +291,27 @@ while True:
                                 send_to_arduino('H') 
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                 
+                elif perclos >= PERCLOS_THRESHOLD:
+                    if macro_fatigue_start is None:
+                        macro_fatigue_start = current_time  # start timer
+
+                    # Check if sustained for 30 seconds
+                    elif (current_time - macro_fatigue_start) >= PERCLOS_WINDOW:
+                        if not macro_fatigue_triggered:
+                            if shared_state.fatigue_level != "MACRO_FATIGUE":
+                                print(f"FATIGUE (MACRO DETECTED) - PERCLOS sustained ≥ {PERCLOS_THRESHOLD:.2f}", time.ctime())
+                                logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                                shared_state.fatigue_level = "MACRO_FATIGUE"
+                                if shared_state.vibration_enabled:
+                                    send_to_arduino('H')  # macro-level haptic warning
+                            put_text(img, "Warning: Macro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
+                            macro_fatigue_triggered = True
+
                 else:
                     # SAFE STATE: Auto-OFF immediately when fatigue is normal and eyes are open
                     frame_counter = 0
+                    macro_fatigue_start = None
+                    macro_fatigue_triggered = False
                     if shared_state.fatigue_level != "SAFE":
                         print("Driver Alerted and Safe.", time.ctime())
                         shared_state.fatigue_level = "SAFE"
