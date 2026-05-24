@@ -10,7 +10,7 @@ from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, 
 from Sample_Alarm.play_sound_alarm import play_alert
 from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
 from Algorithms.Blink_Rate.Blink_Rate_main import BlinkRateDetector
-from Algorithms.Logs.main import setup_logger
+from Algorithms.Logs.main import setup_logger, log_system_performance
 import Algorithms.Server.shared_state as shared_state
 from Algorithms.Server.server import run_server
 from collections import deque
@@ -83,6 +83,12 @@ blink_detector = BlinkRateDetector(
 
 # Start Server
 threading.Thread(target=run_server, daemon=True).start()
+#Starting the performance logger
+threading.Thread(
+    target=log_system_performance,
+    args=(logger,),
+    daemon=True
+).start()
 
 # Start Video Capture
 while True:
@@ -98,7 +104,14 @@ while True:
     dt = current_time - prev_time
     prev_time = current_time
 
-    # FPS display (upper-right)
+   
+
+    if dt > 0:
+        current_fps = 1.0 / dt
+        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
+        #Sharing FPS to flask 
+        shared_state.fps_value = round(fps, 1)
+     # FPS display (upper-right)
     h, w = img.shape[:2]
     cv2.putText(
         img,
@@ -109,12 +122,6 @@ while True:
         (0, 255, 255),
         2,
     )
-
-    if dt > 0:
-        current_fps = 1.0 / dt
-        fps = fps_smoothing * fps + (1 - fps_smoothing) * current_fps
-        #Sharing FPS to flask 
-        shared_state.fps_value = round(fps, 1)
     
     # Face detection using Haar Cascade and extracting ROI (Region of Interest)
     img, face_roi, face_bbox = detect_face(img, face_cascades, return_roi=True)
@@ -167,7 +174,16 @@ while True:
                         EAR_THRESHOLD = baseline_ear * 0.75
                         is_calibrated = True
                         print(f"Calibration Complete! Baseline EAR: {baseline_ear:.2f}, Set Threshold: {EAR_THRESHOLD:.2f}")
-                        logger.info(f"CALIBRATION_COMPLETE,100%,0.0,{baseline_ear:.2f},0.0,{fps:.1f}")
+                        logger.info(
+                            f"CALIBRATION_COMPLETE,"
+                            f"100%,"
+                            f"0.0,"
+                            f"{baseline_ear:.2f},"
+                            f"0.0,"
+                            f"0.0,"
+                            f"{fps:.1f},"
+                            f","
+                        )
                     continue  # Skip detection logic until calibrated
 
                 # Postural Deviation Check
@@ -262,7 +278,18 @@ while True:
                     if shared_state.fatigue_level != "SEVERE_SCENT":
                         print(f"SEVERE FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "SEVERE_SCENT"
-                        logger.info(f"SEVERE_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        logger.info(
+                        
+                            f"SEVERE_FATIGUE,"
+                            f"{confidence_score}%,"
+                            f"{perclos:.2f},"
+                            f"{ear:.2f},"
+                            f"{blink_rate:.1f},"
+                            f"{pitch_ratio:.2f},"
+                            f"{fps:.1f},"
+                            f","
+                            )
+            
                         if shared_state.scent_enabled:
                             send_to_arduino('S') 
                     put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
@@ -273,7 +300,16 @@ while True:
                     if shared_state.fatigue_level != "CRITICAL_BUZZER":
                         print(f"CRITICAL FATIGUE! Confidence: {confidence_score}%", time.ctime())
                         shared_state.fatigue_level = "CRITICAL_BUZZER"
-                        logger.info(f"CRITICAL_FATIGUE,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        logger.info(
+                             f"CRITICAL_FATIGUE,"
+                             f"{confidence_score}%,"
+                             f"{perclos:.2f},"
+                             f"{ear:.2f},"
+                             f"{blink_rate:.1f},"
+                             f"{pitch_ratio:.2f},"
+                             f"{fps:.1f},"
+                             f","
+                            )
                         if shared_state.sound_enabled:
                             send_to_arduino('B') 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
@@ -286,7 +322,17 @@ while True:
                         if shared_state.fatigue_level != "WARNING_HAPTIC":
                             print(f"DROWSY WARNING (Micro-sleep) Confidence: {confidence_score}%", time.ctime())
                             shared_state.fatigue_level = "WARNING_HAPTIC"
-                            logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                            logger.info(
+                                
+                                f"MICRO_SLEEP_WARNING,"
+                                f"{confidence_score}%,"
+                                f"{perclos:.2f},"
+                                f"{ear:.2f},"
+                                f"{blink_rate:.1f},"
+                                f"{pitch_ratio:.2f},"
+                                f"{fps:.1f},"
+                                f","
+                            )
                             if shared_state.vibration_enabled:
                                 send_to_arduino('H') 
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
@@ -300,7 +346,16 @@ while True:
                         if not macro_fatigue_triggered:
                             if shared_state.fatigue_level != "MACRO_FATIGUE":
                                 print(f"FATIGUE (MACRO DETECTED) - PERCLOS sustained ≥ {PERCLOS_THRESHOLD:.2f}", time.ctime())
-                                logger.info(f"MICRO_SLEEP_WARNING,{confidence_score}%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                                logger.info(
+                                    f"MACRO_FATIGUE,"
+                                    f"{confidence_score}%,"
+                                    f"{perclos:.2f},"
+                                    f"{ear:.2f},"
+                                    f"{blink_rate:.1f},"
+                                    f"{pitch_ratio:.2f},"
+                                    f"{fps:.1f},"
+                                    f","
+                                )
                                 shared_state.fatigue_level = "MACRO_FATIGUE"
                                 if shared_state.vibration_enabled:
                                     send_to_arduino('H')  # macro-level haptic warning
@@ -316,7 +371,16 @@ while True:
                         print("Driver Alerted and Safe.", time.ctime())
                         shared_state.fatigue_level = "SAFE"
                         send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
-                        logger.info(f"SAFE_STATE,100%,{perclos:.2f},{ear:.2f},{pitch_ratio:.2f},{fps:.1f}")
+                        logger.info(  
+                            f"SAFE_STATE,"
+                            f"100%,"
+                            f"{perclos:.2f},"
+                            f"{ear:.2f},"
+                            f"{blink_rate:.1f},"
+                            f"{pitch_ratio:.2f},"
+                            f"{fps:.1f},"
+                            f","
+                         )
 
                 # Print Eye Height
                 cv2.putText(
@@ -328,16 +392,30 @@ while True:
                     (255, 0, 0),
                     2,
                 )
+    
+    h, w = img.shape[:2]
+
+    cv2.putText(
+        img,
+        f"FPS: {fps:.1f}",
+        (w - 150, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 255),
+        2,
+    )
+
+
 
     # video in mobile
     with shared_state.lock:
-        shared_state.output_frame = img.copy()
+            shared_state.output_frame = img.copy()
 
-    """"
+    
     cv2.imshow("Wake&Brake Drowsiness Detector", img)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
-    """ 
+     
 video_capture.release()
 cv2.destroyAllWindows()
