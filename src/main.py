@@ -10,13 +10,19 @@ from Algorithms.Eye_Aspect_Ratio.Eye_Aspect_Ratio_main import eye_aspect_ratio, 
 from Sample_Alarm.play_sound_alarm import play_alert
 from Algorithms.Arduino.Arduino_Signal import check_arduino_connection, send_to_arduino
 from Algorithms.Blink_Rate.Blink_Rate_main import BlinkRateDetector
-from Algorithms.Logs.main import setup_logger, log_system_performance
+from Algorithms.Logs.main import (
+    setup_logger,
+    log_system_performance,
+    setup_latency_logger,
+    log_arduino_latency
+) 
 import Algorithms.Server.shared_state as shared_state
 from Algorithms.Server.server import run_server
 from collections import deque
 
 # Initialize System Logger for Post-Trip Review
 logger = setup_logger()
+latency_logger = setup_latency_logger()
 
 # Paths
 _ROOT = Path(__file__).resolve().parent
@@ -291,7 +297,11 @@ while True:
                             )
             
                         if shared_state.scent_enabled:
-                            send_to_arduino('S') 
+                            log_arduino_latency(
+                                latency_logger,
+                                "Severe_Fatigue",
+                                lambda: send_to_arduino('S')
+                            )
                     put_text(img, f"SEVERE FATIGUE ({confidence_score}%) - SCENT", (150, 100), color=(0, 0, 255))
 
                 elif perclos >= 0.70 or (head_state == 1 and perclos >= 0.50):
@@ -311,7 +321,11 @@ while True:
                              f","
                             )
                         if shared_state.sound_enabled:
-                            send_to_arduino('B') 
+                            log_arduino_latency(
+                                latency_logger,
+                                "Critical Fatigue",
+                                lambda: send_to_arduino('B')
+                            ) 
                     put_text(img, f"CRITICAL FATIGUE ({confidence_score}%) - BUZZER", (150, 100), color=(0, 0, 255))
 
                 elif is_closed:
@@ -334,7 +348,11 @@ while True:
                                 f","
                             )
                             if shared_state.vibration_enabled:
-                                send_to_arduino('H') 
+                                log_arduino_latency(
+                                    latency_logger,
+                                    "Micro_Sleep_Warning",
+                                    lambda: send_to_arduino('H')
+                                )
                         put_text(img, "Warning: Micro-sleep! - HAPTIC", (200, 100), color=(0, 165, 255))
                 
                 elif perclos >= PERCLOS_THRESHOLD:
@@ -370,7 +388,12 @@ while True:
                     if shared_state.fatigue_level != "SAFE":
                         print("Driver Alerted and Safe.", time.ctime())
                         shared_state.fatigue_level = "SAFE"
-                        send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
+                        log_arduino_latency(
+                            latency_logger,
+                            "Safe_State",
+                            lambda: send_to_arduino('N') # Sends Auto-OFF. (Arduino keeps Scent locked).
+
+                        )
                         logger.info(  
                             f"SAFE_STATE,"
                             f"100%,"

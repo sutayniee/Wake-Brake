@@ -6,7 +6,7 @@ import Algorithms.Server.shared_state as shared_state
 
 
 # =========================
-# LOGGER SETUP (FATIGUE + SYSTEM USE SAME FILE OR SEPARATE)
+# FATIGUE LOGGER SETUP
 # =========================
 def setup_logger():
     LOG_FILE = "system_fatigue_log.csv"
@@ -15,7 +15,7 @@ def setup_logger():
     logger = logging.getLogger("fatigue_logger")
     logger.setLevel(logging.INFO)
 
-    if not logger.handlers:
+    if not logger.hasHandlers():  # FIXED SAFER CHECK
         handler = logging.FileHandler(LOG_FILE)
 
         formatter = logging.Formatter(
@@ -26,37 +26,29 @@ def setup_logger():
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        # CSV HEADER (ONLY ONCE)
         if not file_exists:
             logger.info(
-                "EVENT_TYPE,CONFIDENCE_SCORE,PERCLOS,EAR,BLINK_RATE,PITCH_RATIO,FPS,CPU (%),MEMORY (%)"
+                "EVENT_TYPE,CONFIDENCE_SCORE,PERCLOS,EAR,BLINK_RATE,PITCH_RATIO,FPS,CPU_PERCENT,MEMORY_PERCENT"
             )
 
     return logger
 
 
 # =========================
-# SYSTEM PERFORMANCE LOGGER THREAD
+# SYSTEM PERFORMANCE LOGGER
 # =========================
 def log_system_performance(logger):
 
-    print("[SYSTEM LOGGER] Started successfully")
+    print("[SYSTEM LOGGER] Started")
 
     while True:
         try:
             cpu = psutil.cpu_percent(interval=None)
             memory = psutil.virtual_memory().percent
-
-            # SAFE FPS READ
             fps = getattr(shared_state, "fps_value", 0.0)
 
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-
-            print(f"[SYSTEM LOGGER] FPS={fps}, CPU={cpu}, MEM={memory}")
-
-            # IMPORTANT: correct CSV alignment
             logger.info(
-                f"SYSTEM,,,,,,{fps},{cpu},{memory}"
+                f"SYSTEM,0,0,0,0,0,{fps},{cpu},{memory}"
             )
 
             time.sleep(10)
@@ -64,3 +56,51 @@ def log_system_performance(logger):
         except Exception as e:
             print("[SYSTEM LOGGER ERROR]", e)
             time.sleep(2)
+
+
+# =========================
+# LATENCY LOGGER SETUP
+# =========================
+def setup_latency_logger():
+    LOG_FILE = "arduino_latency_log.csv"
+    file_exists = os.path.isfile(LOG_FILE)
+
+    logger = logging.getLogger("latency_logger")
+    logger.setLevel(logging.INFO)
+
+    if not logger.hasHandlers():
+        handler = logging.FileHandler(LOG_FILE)
+
+        formatter = logging.Formatter(
+            "%(asctime)s,%(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        if not file_exists:
+            logger.info("EVENT_TYPE,DETECTION_TIME,ARDUINO_TIME,LATENCY_MS")
+
+    return logger
+
+
+# =========================
+# ARDUINO LATENCY TRACKER
+# =========================
+def log_arduino_latency(logger, event_type, send_func):
+
+    detection_time = time.time()
+
+    send_func()
+
+    arduino_time = time.time()
+
+    latency_ms = (arduino_time - detection_time) * 1000
+
+    logger.info(
+        f"{event_type},"
+        f"{detection_time:.6f},"
+        f"{arduino_time:.6f},"
+        f"{latency_ms:.2f}"
+    )
