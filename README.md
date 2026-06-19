@@ -1,77 +1,121 @@
-# Wake-Brake
-Wake&Brake is a real-time driver fatigue detection system developed as an undergraduate thesis project.  
-The system uses computer vision techniques to monitor visual fatigue indicators and triggers a tri-modal alert system (haptic, olfactory, and auditory) when driver drowsiness is detected.
+# Wake&Brake
 
-🛠 Requirements
-- Python 3.9+
-- Git
-- OpenCV
-- NumPy
-- dlib 
+Wake&Brake is a real-time driver fatigue detection system designed to run on a Raspberry Pi with an Arduino acting as a haptic actuator. It combines multiple computer-vision algorithms (Haar cascades, dlib facial landmarks, eye-aspect-ratio, blink-rate and PERCLOS calculations) to detect micro-sleeps and sustained drowsiness and escalate alerts via sound, vibration, buzzer and an optional scent actuator.
 
-1. Clone the repository
-- git clone https://github.com/sutayniee/Wake-Brake.git
-- cd WakeBrake
+---
 
-2. Create a virtual environment
-- python -m venv venv
+## Key features
 
-3. Activate the virtual environment
-▶ Command Prompt (CMD)
-- venv\Scripts\activate
+- Real‑time face detection (Haar cascade)
+- Facial landmark detection (dlib 68-point predictor)
+- Eye Aspect Ratio (EAR) for eye-closure detection
+- Blink-rate estimation
+- PERCLOS (percentage of eye closure over a time window) for macro-fatigue detection
+- Head posture (pitch) estimation for head-down detection
+- Escalating multimodal alerts via Arduino (vibration, buzzer, scent)
+- Local Flask server to stream stats and video frames
+- Performance logging for post-trip analysis
 
-▶ PowerShell (VS Code default)
-- venv\Scripts\Activate.ps1
+---
 
-If PowerShell blocks it, run once:
-- Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+## Repository structure
 
-Then try activating again.
-If activation is successful, you should see:
-  (venv)
+- src/
+  - main.py                — main application loop (capture, detection, alerting, streaming)
+  - Algorithms/            — detection and hardware integration modules
+    - Haar_Cascade/        — face detection utilities
+    - Eye_Aspect_Ratio/    — EAR computation and landmark wrapper
+    - Blink_Rate/          — blink-rate estimator
+    - Arduino/             — Arduino/serial communication helpers
+    - Logs/                — logging helpers
+    - Server/              — Flask server and shared state
+  - Sample_Alarm/          — example alarm playback utility
 
-4. Install dependencies
-- pip install -r requirements.txt
+---
 
-5. Installing dlib
-- cd dlib
-- python -m pip install dlib-19.24.1-cp311-cp311-win_amd64.whl
+## Requirements
 
-5. Verify installation
-- python -c "import cv2, numpy, dlib; print('OpenCV:', cv2.__version__); print('NumPy:', numpy.__version__); print('dlib:', dlib.__version__)"
+This project uses Python and has been developed to run on Raspberry Pi-class hardware. The primary dependencies are listed in `requirements.txt` and include:
 
-6. Select the virtual environment in VS Code (Important)
-- Press Ctrl + Shift + P
-- Select Python: Select Interpreter
-- Choose the interpreter inside the venv folder
+- OpenCV (cv2)
+- dlib
+- numpy
+- flask
+- pyserial
 
-🔁 Basic Git Commands (Quick Reference)
-Check repository status
-- git status
+Install dependencies (prefer a virtual environment):
 
-Stage changes
-- git add .
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-Commit changes
-- git commit -m "Your commit message"
+Notes for Raspberry Pi: use the OS package manager to install any system dependencies (build tools) required for dlib and OpenCV before pip-installing.
 
-Push changes to GitHub
-- git push
+---
 
-Pull latest updates
-- git pull
+## Hardware setup
 
-Switch branch
-- git switch (name of existing branch)
+- Raspberry Pi (tested on Raspberry Pi 3/4)
+- USB-connected Arduino (haptic actuator, buzzer, optional scent module)
 
-Create and switch to the branch
-- git checkout -b (name of branch)
+Connect your Arduino and identify its serial device (e.g. `/dev/ttyACM0` or `/dev/ttyUSB0`). The default serial port used by the code is `/dev/ttyACM0` — edit `src/Algorithms/Arduino/Arduino_Signal.py` if your port differs, or set up a udev rule / symlink for consistent naming.
 
-Delete branch
-- git branch -d (branch_name)
+---
 
-Steps to Merge:
-- Switch to the main branch: git checkout main
-- Pull latest changes: git pull origin main (to avoid conflicts)
-- Merge the feature branch: git merge your-feature-branch
-- Push the changes: git push origin main 
+## Configuration
+
+- Adjust thresholds and windows inside `src/main.py`:
+  - `EAR_THRESHOLD` — eye-closure threshold (adapted after calibration)
+  - `PERCLOS_WINDOW` — window in seconds for PERCLOS calculation
+  - `PERCLOS_THRESHOLD` — PERCLOS threshold to trigger macro alerts
+
+- Enable/disable actuators via `Algorithms/Server/shared_state.py` values (sound_enabled, vibration_enabled, scent_enabled).
+
+---
+
+## Usage
+
+Run the main application (preferably inside the virtual environment):
+
+```bash
+cd src
+python3 main.py
+```
+
+The app opens a camera window and starts a small Flask server (background thread) exposing monitoring endpoints and a video stream. Press `q` in the OpenCV window to quit.
+
+If the app fails to find the Arduino, it will print available serial ports. Connect the Arduino and restart the app.
+
+---
+
+## Performance tips (embedded / Raspberry Pi)
+
+This project performs CPU-intensive computer-vision tasks. If you experience low fps or high CPU usage:
+
+- Lower the camera capture resolution (set `cv2.VideoCapture` properties).
+- Downscale frames for detection (run detection on a smaller copy) and run the dlib predictor on a cropped face ROI.
+- Run heavy detection/landmarking less frequently (every N frames) and track between detections.
+- Share JPEG-encoded frames instead of raw BGR images when streaming to reduce memory/copy costs.
+- Use asynchronous logging or rate-limit prints; avoid blocking I/O on the main loop.
+
+Profiling on the target hardware (cProfile, py-spy) is recommended to find the biggest bottlenecks.
+
+---
+
+## License
+
+This repository is licensed under the MIT License. See the `LICENSE` file in the repository root for details.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please open an issue or submit a pull request with a clear description of the change. For larger changes (new detection backends, performance refactors), open an issue first so we can discuss design.
+
+---
+
+## Contact
+
+If you have questions or want to collaborate, create an issue or contact the repository owner: `sutayniee`.
